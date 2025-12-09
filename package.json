@@ -1,0 +1,115 @@
+{
+  "name": "kh_image_organizer",
+  "version": "1.0.0",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron .",
+    "dev": "tsc && electron .",
+    "watch": "tsc -w",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Organizador de imágenes con visor y miniaturas",
+  "build": {
+    "appId": "com.kh.imageorganizer",
+    "productName": "KH Image Organizer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/index.html",
+      "src/styles.css",
+      "assets/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/node_modules/sharp/**/*",
+      "**/node_modules/@img/**/*"
+    ],
+    "win": {
+      "icon": "assets/kh-icon.ico",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker",
+      "fileAssociations": [
+        {
+          "ext": "jpg",
+          "name": "JPEG Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        },
+        {
+          "ext": "jpeg",
+          "name": "JPEG Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        },
+        {
+          "ext": "png",
+          "name": "PNG Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        },
+        {
+          "ext": "gif",
+          "name": "GIF Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        },
+        {
+          "ext": "webp",
+          "name": "WebP Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        },
+        {
+          "ext": "bmp",
+          "name": "Bitmap Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        },
+        {
+          "ext": "tiff",
+          "name": "TIFF Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        },
+        {
+          "ext": "svg",
+          "name": "SVG Image",
+          "role": "Viewer",
+          "icon": "icon.ico"
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.exe"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.12",
+    "electron-icon-builder": "^2.0.1",
+    "electron-log": "^5.4.3",
+    "electron-packager": "^17.1.2",
+    "electron-rebuild": "^3.2.9",
+    "rcedit": "^5.0.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "sharp": "^0.34.5"
+  }
+}

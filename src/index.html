@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KH Image Organizer</title>
+  <link rel="stylesheet" href="../src/styles.css">
+</head>
+<body>
+  <div class="titlebar">
+    <div class="titlebar-drag-region">KV Image Organizer</div>
+    <div class="window-controls">
+      <button class="window-control" id="window-minimize" title="Minimizar">
+        <svg width="10" height="10" viewBox="0 0 10 10">
+          <rect x="0" y="4" width="10" height="1" fill="currentColor"/>
+        </svg>
+      </button>
+      <button class="window-control" id="window-maximize" title="Maximizar">
+        <svg width="10" height="10" viewBox="0 0 10 10">
+          <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+        </svg>
+      </button>
+      <button class="window-control window-close" id="window-close" title="Cerrar">
+        <svg width="10" height="10" viewBox="0 0 10 10">
+          <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1"/>
+          <line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div class="container">
+    <aside class="sidebar">
+      <button class="sidebar-scroll-btn" id="sidebar-scroll-top-btn" title="Ir al inicio" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7 14l5-5 5 5z"/>
+        </svg>
+      </button>
+      <div class="sidebar-content">
+        <div class="sidebar-section">
+          <h3>Navegación</h3>
+        </div>
+        <div id="destination-section" style="display: none;">
+          <h3>Directorios destino</h3>
+          <div id="destination-directories-list" class="destination-directories-list">
+            <!-- Directorios destino se agregarán aquí -->
+          </div>
+        </div>
+        <div>
+          <h3>Subdirectorios</h3>
+          <button class="parent-directory-btn" id="parent-directory-btn" title="Subir al directorio padre" style="display: none;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 19V5M5 12l7-7 7 7"></path>
+            </svg>
+            <span>Directorio Padre</span>
+          </button>
+          <div id="subdirectories-list" class="subdirectories-list">
+            <p class="empty-message">No hay directorio abierto</p>
+          </div>
+        </div>
+      </div>
+      <button class="sidebar-scroll-btn" id="sidebar-scroll-bottom-btn" title="Ir al final" style="display: none;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7 10l5 5 5-5z"/>
+        </svg>
+      </button>
+    </aside>
+    
+    <main class="viewer" id="viewer">
+      <div class="toolbar" id="toolbar">
+        <!-- Gestión de directorios -->
+        <button class="toolbar-btn" id="open-directory-btn" title="Abrir directorio (Ctrl+O)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="new-folder-btn" title="Nueva carpeta">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            <line x1="12" y1="11" x2="12" y2="17"></line>
+            <line x1="9" y1="14" x2="15" y2="14"></line>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="close-directory-btn" title="Cerrar directorio (Ctrl+W)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+        <div class="toolbar-separator"></div>
+        <!-- Directorios destino -->
+        <button class="toolbar-btn" id="add-destination-btn" title="Agregar directorio destino">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            <line x1="10" y1="13" x2="18" y2="13"></line>
+            <polyline points="15 10 18 13 15 16"></polyline>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="clear-destinations-btn" title="Limpiar directorios destino">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
+        <div class="toolbar-separator"></div>
+        <!-- Controles de zoom -->
+        <button class="toolbar-btn" id="zoom-in-btn" title="Ampliar (Rueda del ratón / Flecha arriba)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="11" y1="8" x2="11" y2="14"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="zoom-out-btn" title="Reducir (Rueda del ratón / Flecha abajo)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="zoom-reset-btn" title="Tamaño real (1:1) - Tecla 1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9V3h6M21 9V3h-6M21 15v6h-6M3 15v6h6"></path>
+            <text x="12" y="16" text-anchor="middle" font-size="10" font-weight="bold" fill="currentColor" stroke="none">1</text>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="fit-to-window-btn" title="Ajustar al visor - Tecla 1">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="toggle-drag-mode-btn" title="Cambiar modo: Mover archivos ⇄ Reposicionar imagen (Click central del mouse)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <path d="M12 2L8 6h3v4H7V7L3 11l4 4v-3h4v4H8l4 4 4-4h-3v-4h4v3l4-4-4-4v3h-4V6h3z"/>
+          </svg>
+        </button>
+        <div class="toolbar-separator"></div>
+        <!-- Mantenimiento -->
+        <!-- <button class="toolbar-btn" id="clear-cache-btn" title="Limpiar caché de miniaturas" style="color: #ff4444;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+          </svg>
+        </button> -->
+        <!-- Filtro (derecha) -->
+        <div class="toolbar-right">
+          <div class="filter-dropdown">
+            <button class="toolbar-btn" id="filter-btn" title="Ordenar imágenes">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="3 6 10 13 10 21 14 21 14 13 21 6 3 6"></polygon>
+              </svg>
+            </button>
+            <div class="filter-menu" id="filter-menu">
+              <button class="filter-option active" data-sort="name-asc">A → Z</button>
+              <button class="filter-option" data-sort="name-desc">Z → A</button>
+              <button class="filter-option" data-sort="date-asc">Fecha (antigua)</button>
+              <button class="filter-option" data-sort="date-desc">Fecha (reciente)</button>
+              <button class="filter-option" data-sort="size-asc">Tamaño (menor)</button>
+              <button class="filter-option" data-sort="size-desc">Tamaño (mayor)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="empty-state" id="empty-state">
+        <svg class="folder-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        </svg>
+        <p class="instruction-text">Haz click aquí para seleccionar el directorio a organizar</p>
+      </div>
+      
+      <div class="image-view" id="image-view" style="display: none;">
+        <div class="main-image-container" id="main-image-container">
+          <img id="current-image" src="" alt="Imagen actual">
+        </div>
+        
+        <div class="file-name-display" id="file-name-display"></div>
+        
+        <div class="carousel-container" id="carousel-container">
+          <button class="carousel-nav carousel-nav-left" id="carousel-nav-left" aria-label="Anterior">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          
+          <div class="carousel-viewport" id="carousel-viewport">
+            <div class="carousel-track" id="carousel-track">
+              <!-- Thumbnails se cargan aquí dinámicamente -->
+            </div>
+          </div>
+          
+          <button class="carousel-nav carousel-nav-right" id="carousel-nav-right" aria-label="Siguiente">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+  
+  <!-- Modal para nueva carpeta -->
+  <div class="modal-overlay" id="new-folder-modal" style="display: none;">
+    <div class="modal-content">
+      <h3>Nueva carpeta</h3>
+      <div class="modal-body">
+        <label for="folder-name-input">Nombre de la carpeta:</label>
+        <div class="input-group">
+          <input type="text" id="folder-name-input" class="folder-input" placeholder="Nombre..." maxlength="255">
+          <button class="btn-primary" id="save-folder-btn">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal para conflictos de archivos duplicados -->
+  <div class="modal-overlay" id="conflict-modal" style="display: none;">
+    <div class="modal-content conflict-modal">
+      <h3>Reemplazar u omitir archivos</h3>
+      <div class="modal-body">
+        <p class="conflict-description">El destino ya tiene un archivo denominado "<span id="conflict-filename"></span>"</p>
+        
+        <div class="conflict-comparison">
+          <div class="conflict-image-section">
+            <h4 class="section-title-source">Carpeta actual</h4>
+            <div class="conflict-image-container">
+              <img id="conflict-source-image" src="" alt="Imagen origen">
+            </div>
+            <div class="conflict-details" id="conflict-source-details">
+              <div class="detail-item">
+                <span class="detail-label">Peso:</span>
+                <span class="detail-value" id="source-size"></span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Fecha:</span>
+                <span class="detail-value" id="source-date"></span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Dimensiones:</span>
+                <span class="detail-value" id="source-dimensions"></span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="conflict-image-section">
+            <h4 class="section-title-dest">Carpeta destino</h4>
+            <div class="conflict-image-container">
+              <img id="conflict-dest-image" src="" alt="Imagen destino">
+            </div>
+            <div class="conflict-details" id="conflict-dest-details">
+              <div class="detail-item">
+                <span class="detail-label">Peso:</span>
+                <span class="detail-value" id="dest-size"></span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Fecha:</span>
+                <span class="detail-value" id="dest-date"></span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Dimensiones:</span>
+                <span class="detail-value" id="dest-dimensions"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="conflict-actions">
+          <p class="conflict-instruction">Elige cuál imagen conservar en el directorio destino con un click o puedes <button class="btn-secondary" id="keep-both-btn">Mantener ambos</button></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="../dist/renderer.js"></script>
+</body>
+</html>
