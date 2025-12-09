@@ -8,17 +8,16 @@ Registro de cambios y evolución del proyecto **KH Image Organizer**.
 
 ### 🎉 Lanzamiento Inicial
 
-Primera versión funcional de KH Image Organizer con sistema dual de organización de imágenes.
+Primera versión funcional de KH Image Organizer.
 
 ### ✨ Características Principales
 
-#### Sistema de Modos Duales
-- **Modo MAA (Mover y Avanzar)**: Sistema completo para mover imágenes a carpetas de destino numeradas (1-9)
-- **Modo REPO (Reposicionar)**: Capacidad de reorganizar imágenes dentro del directorio actual
-- **Toggle entre Modos**: Tecla `0` para alternar entre MAA y REPO con indicador visual en la interfaz
+#### Separacion de sistemas de arrastrado
+- **Modo MAA (Mover Arrastrando)**: Sistema completo para mover imágenes a carpetas de destino
+- **Modo REPO (Reposicionar)**: Capacidad de reoposisionar la imagen en el viewer ya sea con zoom inn o zoom out.
+- **Toggle entre Modos**: Boton con indicador visual para el modo REPO, se activa con el boton central del mouse.
 
 #### Gestión de Directorios
-- **Navegación Mejorada**: Flechas arriba/abajo para navegar subdirectorios
 - **Búsqueda Rápida Multi-Carácter**: Escribe múltiples letras para encontrar directorios (ej: "nu" para "Nueva carpeta")
   - Sistema de acumulación de teclas con timeout de 800ms
   - Búsqueda por coincidencia de string en lugar de solo primera letra
@@ -33,8 +32,10 @@ Primera versión funcional de KH Image Organizer con sistema dual de organizaci�
   - Eficiencia de memoria mejorada
 - **Vista Principal**: Visualización de imagen actual con overlay de información
 - **Nombre de Archivo**: Display del nombre del archivo actual en la interfaz
+- **Zoom optimizado**: El zoom en la imagen se puede hacer con el scroll o las teclas flecha arriba y flecha abajo. Tambien se cuenta con botones para esto en la tool bar.
+- **Ajuste automatico**: Se puede ajustar la imagen a su tamaño original o a que se encuadre en la ventana con la tecla 1. Tambien hay dos botones para estas acciones en la toolbar.
 
-#### Resolución de Conflictos
+#### Resolución de Conflictos de duplicidad al mover archivos.
 - **Modal de Comparación**: Sistema completo de resolución cuando existe archivo en destino
   - Vista lado a lado de imagen origen y destino
   - Comparación de metadatos (tamaño, fechas, dimensiones)
@@ -44,7 +45,6 @@ Primera versión funcional de KH Image Organizer con sistema dual de organizaci�
   2. Mantener archivo de destino (eliminar origen)
   3. Mantener ambos archivos con renombrado automático (sufijo de fecha)
 - **Overlays Visuales**: Indicadores de color con transparencia 0.3 (verde=mantener, rojo=eliminar)
-- **Hover Effects**: CSS moderno con selector `:has()` para mejor UX
 
 #### Ordenamiento y Filtrado
 - **Ordenamiento por Fecha de Creación**: Usa `birthtimeMs` en lugar de `mtimeMs`
@@ -54,8 +54,6 @@ Primera versión funcional de KH Image Organizer con sistema dual de organizaci�
 
 #### Gestión de Archivos
 - **Asociaciones de Archivos**: Configuración completa para todos los formatos de imagen
-- **Persistencia de Destinos**: Las carpetas de destino se guardan entre sesiones
-- **Movimiento de Archivos**: Sistema robusto con manejo de errores y validaciones
 
 #### Interfaz de Usuario
 - **Diseño Limpio**: Interfaz minimalista enfocada en las imágenes
@@ -79,16 +77,15 @@ Primera versión funcional de KH Image Organizer con sistema dual de organizaci�
 - **Icono**: Integración completa de icono personalizado (61.76 KB, formato .ico)
 - **Asociaciones de Archivos**: Configuración automática para 8 formatos de imagen
 
-### 🎮 Atajos de Teclado
+### 🎮 Atajos de Teclado y mouse
 - `←` `→`: Navegación entre imágenes
-- `↑` `↓`: Navegación entre subdirectorios
-- `Enter`: Entrar a subdirectorio seleccionado
-- `Backspace`: Regresar al directorio padre
-- `1-9`: Mover imagen a carpeta de destino correspondiente (modo MAA)
-- `0`: Toggle entre modo MAA y REPO
+- `↑` `↓`: Zoom de la imagen actual
+- `1`: Toggle entre la imagen en su resolucion original y la imagen ajustada a la ventana
 - `A-Z`: Búsqueda rápida de directorios (multi-carácter)
-- `Shift + ←` `→`: Navegación de carpetas de destino
-- `Shift + Enter`: Agregar directorio actual como destino
+- `Supr` / `Delete`: Eliminar imagen actual
+- `Botón central del mouse` (scroll): Toggle entre modo MAA y modo REPO
+- `Scroll horizontal` (botones laterales del mouse): Navegación entre imágenes (solo ratones con botones laterales)
+
 
 ### 📋 Arquitectura
 - **IPC Communication**: Canales optimizados entre main y renderer
@@ -127,12 +124,9 @@ Primera versión funcional de KH Image Organizer con sistema dual de organizaci�
   - Contador de imágenes seleccionadas
   
 ### Futuro
-- Soporte para más plataformas (macOS, Linux)
-- Atajos de teclado personalizables
-- Temas de interfaz
-- Edición básica de imágenes
-- Metadatos EXIF avanzados
-- Búsqueda y filtrado de imágenes
+- Idioma ingles
+- Temas claro de interfaz
+- Organizacion masiva del directorio actual separado por año de creacion.
 
 ---
 
