@@ -105,7 +105,6 @@ body {
 
 .sidebar-scroll-btn {
   width: 100%;
-  height: 32px;
   background-color: rgba(45, 45, 45, 0.95);
   border: 1px solid #4d4d4d;
   border-radius: 4px;
@@ -707,9 +706,157 @@ body {
   .sidebar {
     width: 100%;
     min-width: unset;
+    max-width: unset;
     border-right: none;
     border-bottom: 1px solid #444;
     max-height: 200px;
+    overflow-y: hidden;
+    overflow-x: auto;
+    padding: 10px 52px 10px 10px; /* Space for right button */
+    padding-bottom: 10px;
+  }
+
+  .sidebar-content {
+    flex-direction: row;
+    width: max-content;
+    gap: 20px;
+    height: 100%;
+    align-items: flex-start;
+  }
+
+  .sidebar-menu,
+  .sidebar-section {
+    border-bottom: none;
+    border-right: 1px solid #3d3d3d;
+    padding-right: 15px;
+    margin-right: 0;
+    margin-bottom: 0;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .sidebar-section:last-child {
+    border-right: none;
+  }
+
+  /* Listados horizontales */
+  .subdirectories-list,
+  .destination-directories-list {
+    flex-direction: row;
+    gap: 12px;
+    overflow-x: visible;
+  }
+
+  .subdirectory-item,
+  .destination-item {
+    min-width: 100px;
+    flex-shrink: 0;
+  }
+
+  /* Botón de directorio padre también horizontal */
+  .parent-directory-btn {
+    min-width: 150px;
+  }
+
+  /* Títulos visibles */
+  .sidebar h3,
+  .sidebar-content h3 {
+    white-space: nowrap;
+    margin-bottom: 10px;
+  }
+
+  /* Ocultar título de navegación */
+  .sidebar-menu h3 {
+    display: none;
+  }
+
+  /* Ocultar completamente sidebar menu */
+  .sidebar-menu {
+    display: none;
+  }
+
+  /* Ocultar la primera sección (Navegación) */
+  .sidebar-content > .sidebar-section:first-child {
+    display: none;
+  }
+
+  /* Alinear sección de destinos */
+  #destination-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #destination-section h3 {
+    margin-bottom: 10px;
+  }
+
+  /* Alinear iconos con padding-top diferente para compensar el botón */
+  .destination-directories-list {
+    padding-top: 8px;
+  }
+
+  .subdirectories-list {
+    padding-top: 0;
+  }
+
+  /* Contenedor de subdirectorios con grid para poner botón al lado del título */
+  .sidebar-content > div:last-child {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    grid-template-rows: auto;
+    gap: 10px;
+    align-items: start;
+  }
+
+  .sidebar-content > div:last-child > h3 {
+    grid-column: 1;
+    margin: 0;
+  }
+
+  .sidebar-content > div:last-child > .parent-directory-btn {
+    grid-column: 2;
+    width: auto;
+    min-width: auto;
+    padding: 4px 10px;
+    font-size: 10px;
+    margin: 0;
+    height: fit-content;
+  }
+
+  .sidebar-content > div:last-child > .subdirectories-list {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  #sidebar-scroll-top-btn {
+    position: fixed;
+    left: 10px;
+    top: 60px;
+    width: 32px;
+    height: 130px;
+    margin: 0;
+  }
+
+  #sidebar-scroll-bottom-btn {
+    position: fixed;
+    right: 10px;
+    top: 60px;
+    left: auto;
+    bottom: auto;
+    width: 32px;
+    height: 130px;
+    margin: 0;
+  }
+
+  #sidebar-scroll-top-btn svg {
+    transform: rotate(-90deg);
+  }
+
+  #sidebar-scroll-bottom-btn svg {
+    transform: rotate(-90deg);
   }
 
   .viewer {

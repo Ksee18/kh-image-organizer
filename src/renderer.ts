@@ -509,7 +509,12 @@ function displaySubdirectories(directories: any[]) {
       
       // Clic simple: centrar y parpadear
       htmlItem.addEventListener('click', () => {
-        htmlItem.scrollIntoView({ behavior: 'auto', block: 'center' });
+        const isHorizontal = window.innerWidth <= 1200;
+        if (isHorizontal) {
+          htmlItem.scrollIntoView({ behavior: 'auto', inline: 'center' });
+        } else {
+          htmlItem.scrollIntoView({ behavior: 'auto', block: 'center' });
+        }
         htmlItem.style.animation = 'directoryBlink 0.6s ease-in-out';
         setTimeout(() => {
           htmlItem.style.animation = '';
@@ -561,7 +566,12 @@ function displayDestinationDirectories() {
       
       // Clic simple: centrar y parpadear
       htmlItem.addEventListener('click', () => {
-        htmlItem.scrollIntoView({ behavior: 'auto', block: 'center' });
+        const isHorizontal = window.innerWidth <= 1200;
+        if (isHorizontal) {
+          htmlItem.scrollIntoView({ behavior: 'auto', inline: 'center' });
+        } else {
+          htmlItem.scrollIntoView({ behavior: 'auto', block: 'center' });
+        }
         htmlItem.style.animation = 'directoryBlink 0.6s ease-in-out';
         setTimeout(() => {
           htmlItem.style.animation = '';
@@ -1288,42 +1298,88 @@ if (mainImageContainer) {
 function updateSidebarScrollButtons() {
   if (!sidebar || !sidebarScrollTopBtn || !sidebarScrollBottomBtn) return;
   
-  const scrollTop = sidebar.scrollTop;
-  const scrollHeight = sidebar.scrollHeight;
-  const clientHeight = sidebar.clientHeight;
-  const scrollBottom = scrollHeight - scrollTop - clientHeight;
+  const isHorizontal = window.innerWidth <= 1200;
   
-  // Mostrar botón "ir arriba" si no está en el tope (con un margen de 10px)
-  if (scrollTop > 10) {
-    sidebarScrollTopBtn.style.display = 'flex';
+  if (isHorizontal) {
+    // Modo horizontal: scroll left/right
+    const scrollLeft = sidebar.scrollLeft;
+    const scrollWidth = sidebar.scrollWidth;
+    const clientWidth = sidebar.clientWidth;
+    const scrollRight = scrollWidth - scrollLeft - clientWidth;
+    
+    // Mostrar botón "ir izquierda" si no está al inicio
+    if (scrollLeft > 10) {
+      sidebarScrollTopBtn.style.display = 'flex';
+    } else {
+      sidebarScrollTopBtn.style.display = 'none';
+    }
+    
+    // Mostrar botón "ir derecha" si no está al final
+    if (scrollRight > 10) {
+      sidebarScrollBottomBtn.style.display = 'flex';
+    } else {
+      sidebarScrollBottomBtn.style.display = 'none';
+    }
   } else {
-    sidebarScrollTopBtn.style.display = 'none';
-  }
-  
-  // Mostrar botón "ir abajo" si no está en el fondo (con un margen de 10px)
-  if (scrollBottom > 10) {
-    sidebarScrollBottomBtn.style.display = 'flex';
-  } else {
-    sidebarScrollBottomBtn.style.display = 'none';
+    // Modo vertical: scroll up/down
+    const scrollTop = sidebar.scrollTop;
+    const scrollHeight = sidebar.scrollHeight;
+    const clientHeight = sidebar.clientHeight;
+    const scrollBottom = scrollHeight - scrollTop - clientHeight;
+    
+    // Mostrar botón "ir arriba" si no está en el tope
+    if (scrollTop > 10) {
+      sidebarScrollTopBtn.style.display = 'flex';
+    } else {
+      sidebarScrollTopBtn.style.display = 'none';
+    }
+    
+    // Mostrar botón "ir abajo" si no está en el fondo
+    if (scrollBottom > 10) {
+      sidebarScrollBottomBtn.style.display = 'flex';
+    } else {
+      sidebarScrollBottomBtn.style.display = 'none';
+    }
   }
 }
 
 // Event listeners para los botones de scroll de sidebar
 if (sidebarScrollTopBtn) {
   sidebarScrollTopBtn.addEventListener('click', () => {
-    sidebar.scrollTo({ top: 0, behavior: 'smooth' });
+    const isHorizontal = window.innerWidth <= 1200;
+    if (isHorizontal) {
+      sidebar.scrollTo({ left: 0, behavior: 'smooth' });
+    } else {
+      sidebar.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   });
 }
 
 if (sidebarScrollBottomBtn) {
   sidebarScrollBottomBtn.addEventListener('click', () => {
-    sidebar.scrollTo({ top: sidebar.scrollHeight, behavior: 'smooth' });
+    const isHorizontal = window.innerWidth <= 1200;
+    if (isHorizontal) {
+      sidebar.scrollTo({ left: sidebar.scrollWidth, behavior: 'smooth' });
+    } else {
+      sidebar.scrollTo({ top: sidebar.scrollHeight, behavior: 'smooth' });
+    }
   });
 }
 
 // Detectar scroll en sidebar para actualizar botones
 if (sidebar) {
   sidebar.addEventListener('scroll', updateSidebarScrollButtons);
+  // También actualizar en resize
+  window.addEventListener('resize', updateSidebarScrollButtons);
+  
+  // Scroll horizontal con rueda del mouse en modo horizontal
+  sidebar.addEventListener('wheel', (e) => {
+    const isHorizontal = window.innerWidth <= 1200;
+    if (isHorizontal) {
+      e.preventDefault();
+      sidebar.scrollLeft += e.deltaY;
+    }
+  });
 }
 
 // ===== NAVEGACIÓN RÁPIDA POR DIRECTORIOS =====
@@ -1391,8 +1447,13 @@ function focusDirectoryByKey(key: string) {
     currentFocusIndex = foundIndex;
     const targetElement = allDirectories[foundIndex] as HTMLElement;
     
-    // Scroll instantáneo al elemento
-    targetElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+    // Scroll instantáneo al elemento (adaptado para modo horizontal/vertical)
+    const isHorizontal = window.innerWidth <= 1200;
+    if (isHorizontal) {
+      targetElement.scrollIntoView({ behavior: 'auto', inline: 'center' });
+    } else {
+      targetElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+    }
     
     // Efecto de parpadeo
     targetElement.style.animation = 'directoryBlink 0.6s ease-in-out';
@@ -1423,7 +1484,12 @@ function focusDirectoryByName(folderName: string) {
     const dirNameElement = dir.querySelector('.subdirectory-name') as HTMLElement;
     if (dirNameElement?.textContent === folderName) {
       const targetElement = dir as HTMLElement;
-      targetElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+      const isHorizontal = window.innerWidth <= 1200;
+      if (isHorizontal) {
+        targetElement.scrollIntoView({ behavior: 'auto', inline: 'center' });
+      } else {
+        targetElement.scrollIntoView({ behavior: 'auto', block: 'center' });
+      }
       targetElement.style.animation = 'directoryBlink 0.6s ease-in-out';
       setTimeout(() => {
         targetElement.style.animation = '';
