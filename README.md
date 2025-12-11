@@ -23,7 +23,8 @@ Navigate effortlessly through your image collection using keyboard shortcuts, mo
 
 #### 📁 Advanced File Management
 - **File Associations**: Opens all common image formats (.jpg, .png, .gif, .bmp, .webp, .svg, .ico, .tiff)
-- **Creation Date Sorting**: Images sorted by actual creation date, not modification date
+- **Sorting by Date, Size, Name**: Choose the order in which you want your images to be displayed.
+- **Bulk Image Movement**: If you want to move multiple images to a directory, avoid moving them one by one by selecting all at once.
 
 #### 🖼️ Main Interface Components
 - **Sidebar**: Browse subdirectories and navigate folder structure. Add destination folders from any location, including different drives
@@ -58,7 +59,7 @@ When moving files to destinations where duplicates exist:
 ### 📦 Installation
 
 #### For End Users
-A pre-built installer will be available soon in the `release/` folder for easy installation without technical knowledge.
+A download link for the software will be available soon for easy installation without technical knowledge.
 
 #### For Developers (Build from Source)
 
@@ -135,7 +136,8 @@ Navega sin esfuerzo a través de tu colección de imágenes usando atajos de tec
 
 #### 📁 Gestión Avanzada de Archivos
 - **Asociaciones de Archivos**: Abre todos los formatos de imagen comunes (.jpg, .png, .gif, .bmp, .webp, .svg, .ico, .tiff)
-- **Ordenamiento por Fecha de Creación**: Imágenes ordenadas por fecha real de creación, no de modificación
+- **Ordenamiento por Fecha, Tamaño, Nombre**: Elige el orden en el cual quieres que se muestren tus imagenes.
+- **Movimiento masivo de imagenes**: Si quieres mover multiples imagenes a un directorio evita moverlas de una por una seleccionando todas de una vez.
 
 #### 🖼️ Componentes Principales de la Interfaz
 - **Sidebar**: Explora subdirectorios y navega por la estructura de carpetas. Agrega carpetas de destino desde cualquier ubicación, incluyendo diferentes discos
@@ -170,7 +172,7 @@ Cuando se mueven archivos a destinos donde existen duplicados:
 ### 📦 Instalación
 
 #### Para Usuarios Finales
-Próximamente estará disponible un instalador pre-construido en la carpeta `release/` para instalación fácil sin conocimientos técnicos.
+Próximamente estará disponible un link de descarga del software para instalación fácil sin conocimientos técnicos.
 
 #### Para Desarrolladores (Compilar desde el Código Fuente)
 

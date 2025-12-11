@@ -132,6 +132,12 @@
             <path d="M12 2L8 6h3v4H7V7L3 11l4 4v-3h4v4H8l4 4 4-4h-3v-4h4v3l4-4-4-4v3h-4V6h3z"/>
           </svg>
         </button>
+        <button class="toolbar-btn" id="multi-select-btn" title="Modo selección múltiple (ESC para salir)">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+        </button>
         <div class="toolbar-separator"></div>
         <!-- Mantenimiento -->
         <!-- <button class="toolbar-btn" id="clear-cache-btn" title="Limpiar caché de miniaturas" style="color: #ff4444;">
@@ -172,9 +178,21 @@
           <img id="current-image" src="" alt="Imagen actual">
         </div>
         
+        <!-- Contenedor de miniaturas seleccionadas en modo SM -->
+        <div class="multi-select-thumbnails" id="multi-select-thumbnails" style="display: none;">
+          <!-- Miniaturas seleccionadas se agregan aquí -->
+        </div>
+        
         <div class="file-name-display" id="file-name-display"></div>
         
         <div class="carousel-container" id="carousel-container">
+          <button class="carousel-nav carousel-nav-first" id="carousel-nav-first" aria-label="Primera">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="11 18 5 12 11 6"></polyline>
+              <line x1="5" y1="6" x2="5" y2="18"></line>
+            </svg>
+          </button>
+          
           <button class="carousel-nav carousel-nav-left" id="carousel-nav-left" aria-label="Anterior">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="15 18 9 12 15 6"></polyline>
@@ -190,6 +208,13 @@
           <button class="carousel-nav carousel-nav-right" id="carousel-nav-right" aria-label="Siguiente">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+          
+          <button class="carousel-nav carousel-nav-last" id="carousel-nav-last" aria-label="Última">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="13 18 19 12 13 6"></polyline>
+              <line x1="19" y1="6" x2="19" y2="18"></line>
             </svg>
           </button>
         </div>

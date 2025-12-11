@@ -19,6 +19,7 @@ let imageOffsetY: number = 0; // Offset de posición en modo REPO
 // Selección múltiple
 let isMultiSelectMode: boolean = false;
 let selectedImages: string[] = []; // Rutas de imágenes seleccionadas en orden
+let justEnteredMultiSelect: boolean = false; // Flag para prevenir click después de long-press
 
 // Navegación rápida por directorios
 let lastPressedKey: string = '';
@@ -57,11 +58,12 @@ const parentDirectoryBtn = document.getElementById('parent-directory-btn') as HT
 const carouselTrack = document.getElementById('carousel-track') as HTMLElement;
 const carouselNavLeft = document.getElementById('carousel-nav-left') as HTMLButtonElement;
 const carouselNavRight = document.getElementById('carousel-nav-right') as HTMLButtonElement;
+const carouselNavFirst = document.getElementById('carousel-nav-first') as HTMLButtonElement;
+const carouselNavLast = document.getElementById('carousel-nav-last') as HTMLButtonElement;
 const sidebar = document.querySelector('.sidebar') as HTMLElement;
 const sidebarScrollTopBtn = document.getElementById('sidebar-scroll-top-btn') as HTMLButtonElement;
 const sidebarScrollBottomBtn = document.getElementById('sidebar-scroll-bottom-btn') as HTMLButtonElement;
-const multiselectContainer = document.getElementById('multiselect-container') as HTMLElement;
-const multiselectThumbnails = document.getElementById('multiselect-thumbnails') as HTMLElement;
+const multiSelectThumbnails = document.getElementById('multi-select-thumbnails') as HTMLElement;
 
 // Controles de ventana
 const windowMinimizeBtn = document.getElementById('window-minimize') as HTMLButtonElement;
@@ -74,7 +76,7 @@ const zoomOutBtn = document.getElementById('zoom-out-btn') as HTMLButtonElement;
 const zoomResetBtn = document.getElementById('zoom-reset-btn') as HTMLButtonElement;
 const fitToWindowBtn = document.getElementById('fit-to-window-btn') as HTMLButtonElement;
 const toggleDragModeBtn = document.getElementById('toggle-drag-mode-btn') as HTMLButtonElement;
-const toggleMultiselectBtn = document.getElementById('toggle-multiselect-btn') as HTMLButtonElement;
+const multiSelectBtn = document.getElementById('multi-select-btn') as HTMLButtonElement;
 
 // Filtro
 const filterBtn = document.getElementById('filter-btn') as HTMLButtonElement;
@@ -143,6 +145,11 @@ async function openWithFile(filePath: string) {
 
 async function loadDirectory(directoryPath: string) {
   console.log('[Renderer] Cargando directorio:', directoryPath);
+  
+  // Salir de modo SM si está activo
+  if (isMultiSelectMode) {
+    exitMultiSelectMode();
+  }
   
   // Cancelar generación previa
   thumbnailGenerationQueue.clear();
@@ -250,10 +257,57 @@ function createCarouselItemPlaceholder(imagePath: string, index: number): HTMLEl
   // Spinner
   item.innerHTML = '<div class="spinner"></div>';
   
-  // Click
+  // Variables para long-press
+  let pressTimer: number | null = null;
+  
+  // Mouse down - iniciar timer para long-press
+  item.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // Solo botón izquierdo
+    
+    pressTimer = window.setTimeout(() => {
+      // Long-press detectado - entrar en SM con esta imagen
+      if (!isMultiSelectMode) {
+        const idx = parseInt(item.dataset.index || '0', 10);
+        currentImageIndex = idx;
+        enterMultiSelectMode();
+        justEnteredMultiSelect = true; // Activar flag
+      }
+    }, 500); // 500ms para long-press
+  });
+  
+  // Mouse up o leave - cancelar timer
+  item.addEventListener('mouseup', () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+  });
+  
+  item.addEventListener('mouseleave', () => {
+    if (pressTimer) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+  });
+  
+  // Click normal
   item.addEventListener('click', () => {
+    // Ignorar click si acabamos de entrar en SM vía long-press
+    if (justEnteredMultiSelect) {
+      justEnteredMultiSelect = false;
+      return;
+    }
+    
     const idx = parseInt(item.dataset.index || '0', 10);
-    navigateToImage(idx);
+    
+    if (isMultiSelectMode) {
+      // En modo SM, toggle selección
+      const imgPath = currentImages[idx];
+      toggleImageSelection(imgPath);
+    } else {
+      // Modo normal, navegar
+      navigateToImage(idx);
+    }
   });
   
   return item;
@@ -332,6 +386,16 @@ async function generateSingleThumbnail(index: number) {
 function navigateToImage(index: number) {
   if (index < 0 || index >= currentImages.length) return;
   currentImageIndex = index;
+  
+  // En modo SM, solo actualizar carrusel sin cambiar vista
+  if (isMultiSelectMode) {
+    updateActiveCarouselItem();
+    scrollCarouselToIndex(currentImageIndex);
+    generateVisibleThumbnails();
+    return;
+  }
+  
+  // Modo normal
   showImage(currentImages[currentImageIndex]);
   updateActiveCarouselItem();
   scrollCarouselToIndex(currentImageIndex);
@@ -629,14 +693,27 @@ function setupDropZone(element: HTMLElement) {
     const targetPath = element.dataset.path;
     if (!targetPath || currentImages.length === 0) return;
     
-    const currentImagePath = currentImages[currentImageIndex];
-    await moveImageToDirectory(currentImagePath, targetPath);
+    // Verificar si es modo SM
+    if (isMultiSelectMode && selectedImages.length > 0) {
+      // Mover todas las imágenes seleccionadas
+      await moveSelectedImages(targetPath);
+    } else {
+      // Modo normal - mover solo la imagen actual
+      const currentImagePath = currentImages[currentImageIndex];
+      await moveImageToDirectory(currentImagePath, targetPath);
+    }
   });
 }
 
 // Configurar eventos de drag en la imagen principal
 if (currentImage) {
   currentImage.addEventListener('dragstart', (e) => {
+    // No permitir drag en modo SM (se arrastra desde miniaturas del viewer)
+    if (isMultiSelectMode) {
+      e.preventDefault();
+      return;
+    }
+    
     if (currentImages.length === 0) {
       e.preventDefault();
       return;
@@ -692,6 +769,9 @@ async function moveImageToDirectory(imagePath: string, targetDirectory: string) 
         // Actualizar los índices de las miniaturas restantes
         updateCarouselIndices();
         
+        // Generar miniaturas visibles después de mover
+        generateVisibleThumbnails();
+        
         updateNavigationButtons();
       }
     } else if (result.exists && result.targetPath) {
@@ -739,6 +819,9 @@ function removeCurrentImageFromList() {
     // Actualizar los índices de las miniaturas restantes
     updateCarouselIndices();
     
+    // Generar miniaturas visibles después de eliminar
+    generateVisibleThumbnails();
+    
     updateNavigationButtons();
   }
 }
@@ -771,6 +854,26 @@ if (addDestinationBtn) {
     if (directoryPath && !destinationDirectories.includes(directoryPath)) {
       destinationDirectories.push(directoryPath);
       displayDestinationDirectories();
+      
+      // Hacer focus en el directorio recién agregado
+      setTimeout(() => {
+        const destItems = destinationDirectoriesList.querySelectorAll('.destination-item');
+        const lastItem = destItems[destItems.length - 1] as HTMLElement;
+        
+        if (lastItem) {
+          const isHorizontal = window.innerWidth <= 1200;
+          if (isHorizontal) {
+            lastItem.scrollIntoView({ behavior: 'auto', inline: 'center' });
+          } else {
+            lastItem.scrollIntoView({ behavior: 'auto', block: 'center' });
+          }
+          
+          lastItem.style.animation = 'directoryBlink 0.6s ease-in-out';
+          setTimeout(() => {
+            lastItem.style.animation = '';
+          }, 600);
+        }
+      }, 50);
     }
   });
 }
@@ -899,33 +1002,61 @@ if (newFolderModal) {
   });
 }
 
+if (carouselNavFirst) {
+  carouselNavFirst.addEventListener('click', () => navigateToFirst());
+}
+
 if (carouselNavLeft) {
-  carouselNavLeft.addEventListener('click', () => navigateToFirst());
+  carouselNavLeft.addEventListener('click', () => navigatePrevious());
 }
 
 if (carouselNavRight) {
-  carouselNavRight.addEventListener('click', () => navigateToLast());
+  carouselNavRight.addEventListener('click', () => navigateNext());
+}
+
+if (carouselNavLast) {
+  carouselNavLast.addEventListener('click', () => navigateToLast());
 }
 
 document.addEventListener('keydown', (e) => {
   if (currentImages.length === 0) return;
   
+  // CTRL para activar modo SM
+  if (e.key === 'Control' && !isMultiSelectMode) {
+    e.preventDefault();
+    toggleMultiSelectMode();
+    return;
+  }
+  
+  // ESC para salir de modo SM
+  if (e.key === 'Escape' && isMultiSelectMode) {
+    e.preventDefault();
+    exitMultiSelectMode();
+    return;
+  }
+  
   if (e.key === 'ArrowLeft') {
     e.preventDefault();
+    // En SM solo mueve carrusel, no cambia selección
     navigatePrevious();
   } else if (e.key === 'ArrowRight') {
     e.preventDefault();
+    // En SM solo mueve carrusel, no cambia selección
     navigateNext();
   } else if (e.key === 'ArrowUp') {
+    if (isMultiSelectMode) return; // Deshabilitado en SM
     e.preventDefault();
     zoomIn();
   } else if (e.key === 'ArrowDown') {
+    if (isMultiSelectMode) return; // Deshabilitado en SM
     e.preventDefault();
     zoomOut();
   } else if (e.key === 'Delete') {
+    if (isMultiSelectMode) return; // Deshabilitado en SM
     e.preventDefault();
     deleteCurrentImage();
   } else if (e.key === '1') {
+    if (isMultiSelectMode) return; // Deshabilitado en SM
     e.preventDefault();
     toggleFitMode();
   } else if (/^[a-zA-Z2-9]$/.test(e.key) && quickNavigationEnabled) {
@@ -1137,6 +1268,13 @@ if (fitToWindowBtn) {
 if (toggleDragModeBtn) {
   toggleDragModeBtn.addEventListener('click', () => {
     toggleDragMode();
+  });
+}
+
+// Event listener para el botón de selección múltiple
+if (multiSelectBtn) {
+  multiSelectBtn.addEventListener('click', () => {
+    toggleMultiSelectMode();
   });
 }
 
@@ -1407,9 +1545,16 @@ function focusDirectoryByKey(key: string) {
     currentFocusIndex = -1;
   }, 800);
   
-  // Si es la misma búsqueda, buscar el siguiente
+  // Detectar si es spam de una sola letra (ej: "nnn")
+  const isRepeatedChar = directorySearchString.length > 1 && 
+                         directorySearchString.split('').every(c => c === directorySearchString[0]);
+  
+  // Si es spam de letra, buscar con solo la primera letra
+  const actualSearchString = isRepeatedChar ? directorySearchString[0] : directorySearchString;
+  
+  // Si es spam de letra y hay un índice previo, buscar el siguiente
   let searchFromIndex = 0;
-  if (lastPressedKey === directorySearchString && currentFocusIndex !== -1) {
+  if (isRepeatedChar && currentFocusIndex !== -1) {
     searchFromIndex = currentFocusIndex + 1;
   }
   
@@ -1426,7 +1571,7 @@ function focusDirectoryByKey(key: string) {
   let foundIndex = -1;
   for (let i = searchFromIndex; i < allDirectories.length; i++) {
     const dirName = (allDirectories[i].querySelector('.subdirectory-name') as HTMLElement)?.textContent || '';
-    if (dirName.toUpperCase().startsWith(directorySearchString)) {
+    if (dirName.toUpperCase().startsWith(actualSearchString)) {
       foundIndex = i;
       break;
     }
@@ -1436,7 +1581,7 @@ function focusDirectoryByKey(key: string) {
   if (foundIndex === -1 && searchFromIndex > 0) {
     for (let i = 0; i < searchFromIndex; i++) {
       const dirName = (allDirectories[i].querySelector('.subdirectory-name') as HTMLElement)?.textContent || '';
-      if (dirName.toUpperCase().startsWith(directorySearchString)) {
+      if (dirName.toUpperCase().startsWith(actualSearchString)) {
         foundIndex = i;
         break;
       }
@@ -1711,4 +1856,281 @@ if (conflictModal) {
   
   // Inicializar estado de botones
   updateSidebarScrollButtons();
+}
+// ============================================
+// FUNCIONES DE SELECCIÓN MÚLTIPLE (SM)
+// ============================================
+
+function toggleMultiSelectMode() {
+  if (isMultiSelectMode) {
+    exitMultiSelectMode();
+  } else {
+    enterMultiSelectMode();
+  }
+}
+
+function enterMultiSelectMode() {
+  if (currentImages.length === 0) return;
+  
+  isMultiSelectMode = true;
+  selectedImages = [];
+  
+  // Agregar imagen actual como primera seleccionada
+  selectedImages.push(currentImages[currentImageIndex]);
+  
+  // Actualizar UI
+  multiSelectBtn.classList.add('active');
+  imageView.classList.add('multi-select-active');
+  mainImageContainer.style.display = 'none';
+  multiSelectThumbnails.style.display = 'flex';
+  fileNameDisplay.style.display = 'none';
+  
+  // Deshabilitar controles
+  disableControlsForMultiSelect();
+  
+  // Renderizar miniaturas seleccionadas
+  renderMultiSelectThumbnails();
+  
+  // Actualizar estilos de miniaturas en carrusel
+  updateCarouselSelectedItems();
+  
+  console.log('[SM] Modo selección múltiple activado');
+}
+
+function exitMultiSelectMode() {
+  isMultiSelectMode = false;
+  selectedImages = [];
+  justEnteredMultiSelect = false; // Resetear flag
+  
+  // Actualizar UI
+  multiSelectBtn.classList.remove('active');
+  imageView.classList.remove('multi-select-active');
+  mainImageContainer.style.display = 'flex';
+  multiSelectThumbnails.style.display = 'none';
+  multiSelectThumbnails.innerHTML = '';
+  fileNameDisplay.style.display = 'block';
+  
+  // Rehabilitar controles
+  enableControlsAfterMultiSelect();
+  
+  // Mostrar imagen actual del carrusel
+  if (currentImages.length > 0) {
+    showImage(currentImages[currentImageIndex]);
+  }
+  
+  // Actualizar estilos de miniaturas en carrusel
+  updateCarouselSelectedItems();
+  
+  console.log('[SM] Modo selección múltiple desactivado');
+}
+
+function renderMultiSelectThumbnails() {
+  multiSelectThumbnails.innerHTML = '';
+  
+  for (const imagePath of selectedImages) {
+    const item = document.createElement('div');
+    item.className = 'multi-select-thumbnail-item';
+    item.dataset.imagePath = imagePath;
+    
+    // Contenedor de imagen
+    const imageContainer = document.createElement('div');
+    imageContainer.className = 'thumbnail-image';
+    
+    // Crear imagen
+    const img = document.createElement('img');
+    const thumbPath = thumbnailCache.get(imagePath);
+    if (thumbPath) {
+      img.src = `file:///${thumbPath.replace(/\\/g, '/')}`;
+    } else {
+      img.src = `file:///${imagePath.replace(/\\/g, '/')}`;
+    }
+    img.alt = 'Selected';
+    
+    imageContainer.appendChild(img);
+    item.appendChild(imageContainer);
+    
+    // Nombre de archivo
+    const fileName = imagePath.split('\\').pop() || imagePath.split('/').pop() || '';
+    const nameElement = document.createElement('div');
+    nameElement.className = 'thumbnail-name';
+    nameElement.textContent = fileName;
+    nameElement.title = fileName; // Tooltip con nombre completo
+    
+    item.appendChild(nameElement);
+    multiSelectThumbnails.appendChild(item);
+    
+    // Habilitar drag desde miniaturas del viewer
+    item.draggable = true;
+    item.addEventListener('dragstart', handleMultiSelectDragStart);
+  }
+}
+
+function updateCarouselSelectedItems() {
+  const items = carouselTrack.querySelectorAll('.carousel-item');
+  items.forEach((item, index) => {
+    const imagePath = currentImages[index];
+    if (selectedImages.includes(imagePath)) {
+      item.classList.add('selected');
+    } else {
+      item.classList.remove('selected');
+    }
+  });
+}
+
+function toggleImageSelection(imagePath: string) {
+  const index = selectedImages.indexOf(imagePath);
+  
+  if (index > -1) {
+    // Ya está seleccionada, eliminarla
+    selectedImages.splice(index, 1);
+  } else {
+    // No está seleccionada, agregarla
+    selectedImages.push(imagePath);
+  }
+  
+  // Actualizar UI
+  renderMultiSelectThumbnails();
+  updateCarouselSelectedItems();
+  
+  // Si no quedan imágenes seleccionadas, salir de SM
+  if (selectedImages.length === 0) {
+    exitMultiSelectMode();
+  }
+}
+
+function handleMultiSelectDragStart(e: DragEvent) {
+  if (!isMultiSelectMode) return;
+  
+  // Preparar datos para el drag
+  e.dataTransfer!.effectAllowed = 'move';
+  e.dataTransfer!.setData('text/plain', 'multiselect');
+  
+  console.log(`[SM] Iniciando arrastre de ${selectedImages.length} imágenes`);
+}
+
+async function moveSelectedImages(targetDirectory: string) {
+  if (!isMultiSelectMode || selectedImages.length === 0) return;
+  
+  console.log(`[SM] Moviendo ${selectedImages.length} imágenes a ${targetDirectory}`);
+  
+  const imagesToMove = [...selectedImages];
+  let movedCount = 0;
+  
+  // Guardar el índice actual antes de mover
+  const originalIndex = currentImageIndex;
+  const originalLength = currentImages.length;
+  
+  // Verificar si alguna imagen movida está después o igual al índice actual
+  let hasImagesAfterCurrent = false;
+  for (const imagePath of imagesToMove) {
+    const imgIndex = currentImages.indexOf(imagePath);
+    if (imgIndex >= originalIndex) {
+      hasImagesAfterCurrent = true;
+      break;
+    }
+  }
+  
+  for (const imagePath of imagesToMove) {
+    try {
+      const result = await window.electronAPI.moveFile(imagePath, targetDirectory);
+      
+      if (result.success) {
+        // Imagen movida exitosamente
+        movedCount++;
+        
+        // Eliminar de arrays
+        const imgIndex = currentImages.indexOf(imagePath);
+        if (imgIndex > -1) {
+          currentImages.splice(imgIndex, 1);
+          
+          // Ajustar currentImageIndex si la imagen eliminada estaba antes
+          if (imgIndex < currentImageIndex) {
+            currentImageIndex--;
+          }
+          
+          // Eliminar miniatura del carrusel
+          const thumbnails = carouselTrack.querySelectorAll('.carousel-item');
+          if (thumbnails[imgIndex]) {
+            thumbnails[imgIndex].remove();
+          }
+        }
+        
+        // Eliminar de selección
+        const selIndex = selectedImages.indexOf(imagePath);
+        if (selIndex > -1) {
+          selectedImages.splice(selIndex, 1);
+        }
+        
+        // Eliminar del cache
+        thumbnailCache.delete(imagePath);
+        
+      } else if (result.exists && result.targetPath) {
+        // Conflicto detectado - manejar con modal
+        console.log('[SM] Conflicto detectado, abriendo modal');
+        await handleFileConflict(imagePath, targetDirectory, result.targetPath);
+        
+        // Después del modal, verificar si la imagen fue movida
+        if (!currentImages.includes(imagePath)) {
+          movedCount++;
+        }
+      }
+    } catch (error) {
+      console.error('[SM] Error al mover imagen:', imagePath, error);
+    }
+  }
+  
+  console.log(`[SM] Movidas ${movedCount} de ${imagesToMove.length} imágenes`);
+  
+  // Salir de SM
+  exitMultiSelectMode();
+  
+  // Actualizar vista
+  if (currentImages.length === 0) {
+    emptyState.style.display = 'flex';
+    imageView.style.display = 'none';
+  } else {
+    // Ajustar índice: si movimos imágenes que estaban al final y eran >= al índice actual,
+    // ir a la imagen anterior en lugar de la siguiente
+    if (currentImageIndex >= currentImages.length) {
+      currentImageIndex = currentImages.length - 1;
+    }
+    
+    // Mostrar imagen correspondiente
+    showImage(currentImages[currentImageIndex]);
+    updateCarouselIndices();
+    generateVisibleThumbnails();
+    updateNavigationButtons();
+  }
+}
+
+function disableControlsForMultiSelect() {
+  // Deshabilitar botones de zoom
+  if (zoomInBtn) zoomInBtn.disabled = true;
+  if (zoomOutBtn) zoomOutBtn.disabled = true;
+  if (zoomResetBtn) zoomResetBtn.disabled = true;
+  if (fitToWindowBtn) fitToWindowBtn.disabled = true;
+  
+  // Deshabilitar REPO
+  if (toggleDragModeBtn) toggleDragModeBtn.disabled = true;
+  
+  // Deshabilitar filtro
+  if (filterBtn) filterBtn.disabled = true;
+  
+  console.log('[SM] Controles deshabilitados');
+}
+
+function enableControlsAfterMultiSelect() {
+  // Rehabilitar botones de zoom
+  if (zoomInBtn) zoomInBtn.disabled = false;
+  if (zoomOutBtn) zoomOutBtn.disabled = false;
+  if (zoomResetBtn) zoomResetBtn.disabled = false;
+  if (fitToWindowBtn) fitToWindowBtn.disabled = false;
+  
+  // Rehabilitar REPO
+  if (toggleDragModeBtn) toggleDragModeBtn.disabled = false;
+  
+  // Rehabilitar filtro
+  if (filterBtn) filterBtn.disabled = false;
+  
+  console.log('[SM] Controles rehabilitados');
 }
