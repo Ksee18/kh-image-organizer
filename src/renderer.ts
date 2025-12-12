@@ -1023,6 +1023,26 @@ if (carouselNavLast) {
   carouselNavLast.addEventListener('click', () => navigateToLast());
 }
 
+// Scroll vertical del carrusel con rueda del mouse
+if (carouselTrack) {
+  carouselTrack.addEventListener('wheel', (e) => {
+    if (currentImages.length === 0) return;
+    
+    // Solo procesar scroll vertical (no horizontal)
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Scroll hacia abajo = siguiente imagen, hacia arriba = imagen anterior
+      if (e.deltaY > 0) {
+        navigateNext();
+      } else if (e.deltaY < 0) {
+        navigatePrevious();
+      }
+    }
+  }, { passive: false });
+}
+
 document.addEventListener('keydown', (e) => {
   if (currentImages.length === 0) return;
   
