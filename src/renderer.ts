@@ -779,11 +779,16 @@ async function moveImageToDirectory(imagePath: string, targetDirectory: string) 
       console.log('[Renderer] Conflicto detectado, abriendo modal');
       await handleFileConflict(imagePath, targetDirectory, result.targetPath);
     } else {
-      console.error('[Renderer] Error al mover imagen');
+      console.error('[Renderer] Error al mover imagen - resultado inesperado:', result);
       alert('Error al mover la imagen');
     }
   } catch (error) {
-    console.error('[Renderer] Error al mover imagen:', error);
+    console.error('[Renderer] Error al mover imagen - excepción capturada:', error);
+    console.error('[Renderer] Detalles del error:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      errorObject: error
+    });
     alert('Error al mover la imagen');
   }
 }

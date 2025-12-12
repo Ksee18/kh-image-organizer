@@ -341,9 +341,23 @@ ipcMain.handle('move-file', async (event, filePath: string, targetDirectory: str
       return { success: false, exists: true, targetPath };
     }
     
-    await fs.promises.rename(filePath, targetPath);
-    logger.info('Archivo movido exitosamente', { from: filePath, to: targetPath });
-    return { success: true, exists: false };
+    // Intentar rename primero (rápido para mismo disco)
+    try {
+      await fs.promises.rename(filePath, targetPath);
+      logger.info('Archivo movido exitosamente con rename', { from: filePath, to: targetPath });
+      return { success: true, exists: false };
+    } catch (renameError: any) {
+      // Si falla por cross-device (EXDEV), copiar y eliminar
+      if (renameError.code === 'EXDEV') {
+        logger.info('Movimiento entre discos detectado, usando copy+delete', { from: filePath, to: targetPath });
+        await fs.promises.copyFile(filePath, targetPath);
+        await fs.promises.unlink(filePath);
+        logger.info('Archivo movido exitosamente con copy+delete', { from: filePath, to: targetPath });
+        return { success: true, exists: false };
+      }
+      // Si es otro error, lanzarlo
+      throw renameError;
+    }
   } catch (error) {
     logger.error('Error moviendo archivo', error);
     return { success: false, exists: false, error: String(error) };
