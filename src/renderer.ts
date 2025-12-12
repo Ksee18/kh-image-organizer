@@ -20,6 +20,8 @@ let imageOffsetY: number = 0; // Offset de posición en modo REPO
 let isMultiSelectMode: boolean = false;
 let selectedImages: string[] = []; // Rutas de imágenes seleccionadas en orden
 let justEnteredMultiSelect: boolean = false; // Flag para prevenir click después de long-press
+let pendingConflicts: Array<{sourcePath: string, targetDirectory: string, targetPath: string}> = []; // Cola de conflictos pendientes
+let isProcessingConflicts: boolean = false; // Flag para saber si estamos procesando conflictos
 
 // Navegación rápida por directorios
 let lastPressedKey: string = '';
@@ -1778,6 +1780,40 @@ function closeConflictModal() {
   });
 }
 
+function resolveConflictAndContinue(sourcePath: string) {
+  // Si estamos procesando conflictos de SM, eliminar de la cola y miniatura
+  if (isProcessingConflicts && pendingConflicts.length > 0) {
+    // Eliminar el conflicto actual de la cola
+    pendingConflicts.shift();
+    
+    // Eliminar de arrays
+    const imgIndex = currentImages.indexOf(sourcePath);
+    if (imgIndex > -1) {
+      currentImages.splice(imgIndex, 1);
+      
+      // Ajustar currentImageIndex si la imagen eliminada estaba antes
+      if (imgIndex < currentImageIndex) {
+        currentImageIndex--;
+      }
+      
+      // Eliminar miniatura del carrusel
+      const thumbnails = carouselTrack.querySelectorAll('.carousel-item');
+      if (thumbnails[imgIndex]) {
+        thumbnails[imgIndex].remove();
+      }
+    }
+    
+    // Eliminar del cache
+    thumbnailCache.delete(sourcePath);
+    
+    // Procesar siguiente conflicto
+    processNextConflict();
+  } else {
+    // Comportamiento normal (no SM)
+    removeCurrentImageFromList();
+  }
+}
+
 // Click en las imágenes para seleccionar
 if (conflictSourceImage && conflictDestImage) {
   conflictSourceImage.parentElement?.addEventListener('click', async () => {
@@ -1801,8 +1837,9 @@ if (conflictSourceImage && conflictDestImage) {
       
       if (result.success) {
         console.log('[Renderer] Archivo reemplazado exitosamente');
+        const sourcePath = currentConflict.sourcePath;
         closeConflictModal();
-        removeCurrentImageFromList();
+        resolveConflictAndContinue(sourcePath);
       } else {
         alert('Error al mover el archivo');
       }
@@ -1821,8 +1858,9 @@ if (conflictSourceImage && conflictDestImage) {
       
       if (deleteSuccess) {
         console.log('[Renderer] Archivo origen eliminado');
+        const sourcePath = currentConflict.sourcePath;
         closeConflictModal();
-        removeCurrentImageFromList();
+        resolveConflictAndContinue(sourcePath);
       } else {
         alert('Error al eliminar el archivo');
       }
@@ -1859,8 +1897,9 @@ if (keepBothBtn) {
       
       if (result.success) {
         console.log('[Renderer] Ambos archivos conservados');
+        const sourcePathCopy = currentConflict.sourcePath;
         closeConflictModal();
-        removeCurrentImageFromList();
+        resolveConflictAndContinue(sourcePathCopy);
       } else {
         alert('Error al mover el archivo con nuevo nombre');
       }
@@ -2041,6 +2080,9 @@ async function moveSelectedImages(targetDirectory: string) {
   const imagesToMove = [...selectedImages];
   let movedCount = 0;
   
+  // Limpiar cola de conflictos pendientes
+  pendingConflicts = [];
+  
   // Guardar el índice actual antes de mover
   const originalIndex = currentImageIndex;
   const originalLength = currentImages.length;
@@ -2090,14 +2132,13 @@ async function moveSelectedImages(targetDirectory: string) {
         thumbnailCache.delete(imagePath);
         
       } else if (result.exists && result.targetPath) {
-        // Conflicto detectado - manejar con modal
-        console.log('[SM] Conflicto detectado, abriendo modal');
-        await handleFileConflict(imagePath, targetDirectory, result.targetPath);
-        
-        // Después del modal, verificar si la imagen fue movida
-        if (!currentImages.includes(imagePath)) {
-          movedCount++;
-        }
+        // Conflicto detectado - agregar a la cola de pendientes
+        console.log('[SM] Conflicto detectado, agregando a cola:', imagePath);
+        pendingConflicts.push({
+          sourcePath: imagePath,
+          targetDirectory: targetDirectory,
+          targetPath: result.targetPath
+        });
       }
     } catch (error) {
       console.error('[SM] Error al mover imagen:', imagePath, error);
@@ -2105,6 +2146,7 @@ async function moveSelectedImages(targetDirectory: string) {
   }
   
   console.log(`[SM] Movidas ${movedCount} de ${imagesToMove.length} imágenes`);
+  console.log(`[SM] Conflictos pendientes: ${pendingConflicts.length}`);
   
   // Salir de SM
   exitMultiSelectMode();
@@ -2120,12 +2162,47 @@ async function moveSelectedImages(targetDirectory: string) {
       currentImageIndex = currentImages.length - 1;
     }
     
-    // Mostrar imagen correspondiente
-    showImage(currentImages[currentImageIndex]);
+    // Mostrar imagen correspondiente (solo si no hay conflictos pendientes)
+    if (pendingConflicts.length === 0) {
+      showImage(currentImages[currentImageIndex]);
+    }
     updateCarouselIndices();
     generateVisibleThumbnails();
     updateNavigationButtons();
   }
+  
+  // Procesar conflictos pendientes uno por uno
+  if (pendingConflicts.length > 0) {
+    console.log(`[SM] Iniciando procesamiento de ${pendingConflicts.length} conflictos`);
+    processNextConflict();
+  }
+}
+
+function processNextConflict() {
+  if (pendingConflicts.length === 0) {
+    console.log('[SM] Todos los conflictos resueltos');
+    isProcessingConflicts = false;
+    
+    // Mostrar la imagen actual después de resolver todos los conflictos
+    if (currentImages.length > 0) {
+      // Ajustar índice si es necesario
+      if (currentImageIndex >= currentImages.length) {
+        currentImageIndex = currentImages.length - 1;
+      }
+      showImage(currentImages[currentImageIndex]);
+      updateCarouselIndices();
+      generateVisibleThumbnails();
+      updateNavigationButtons();
+    }
+    return;
+  }
+  
+  isProcessingConflicts = true;
+  const conflict = pendingConflicts[0]; // Obtener el primero sin eliminarlo aún
+  console.log(`[SM] Procesando conflicto ${pendingConflicts.length} restantes`);
+  
+  // Abrir modal de conflicto
+  handleFileConflict(conflict.sourcePath, conflict.targetDirectory, conflict.targetPath);
 }
 
 function disableControlsForMultiSelect() {
