@@ -37,6 +37,8 @@ export interface ElectronAPI {
   openDirectoryDialog: () => Promise<string | null>;
   getImagesFromDirectory: (directoryPath: string) => Promise<string[]>;
   getImageMetadata: (imagePaths: string[]) => Promise<ImageMetadata[]>;
+  getExplorerDateOrder: (directoryPath: string, descending: boolean) => Promise<string[] | null>;
+  organizeByYear: (directoryPath: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   getSingleImageMetadata: (imagePath: string) => Promise<ImageMetadata | null>;
   getSubdirectories: (directoryPath: string) => Promise<Subdirectory[]>;
   generateThumbnail: (request: ThumbnailRequest) => Promise<ThumbnailResult | null>;

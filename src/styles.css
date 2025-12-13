@@ -468,6 +468,43 @@ body {
   line-height: 1.5;
 }
 
+/* Loading Overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(26, 26, 26, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4CAF50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  margin-top: 20px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
 /* Image View (Main Image + Carousel) */
 .image-view {
   width: 100%;
@@ -887,10 +924,11 @@ body {
 .modal-content {
   background-color: #2d2d2d;
   border-radius: 8px;
-  padding: 20px;
+  padding: 0;
   min-width: 350px;
   max-width: 90%;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
 .modal-content h3 {
@@ -900,6 +938,7 @@ body {
 }
 
 .modal-body {
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -988,6 +1027,12 @@ body {
   max-width: 1200px;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.conflict-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .conflict-description {
@@ -1423,4 +1468,72 @@ body {
   opacity: 0.3;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+/* Modal de organizar por año */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.modal-header {
+  background-color: #f2f2ff;
+  opacity: 1;
+  background-image: linear-gradient(#d4d4e6 1px, transparent 1px), linear-gradient(to right, #d4d4e6 1px, #f2f2ff 1px);
+  background-size: 20px 20px;
+  padding: 20px;
+  border-radius: 8px 8px 0 0;
+}
+
+.modal-header h2,
+.modal-header h3 {
+  margin: 0;
+  color: #1a1a1a;
+  font-size: 20px;
+  font-weight: 600;
+  opacity: 1;
+}
+
+.modal-body-year {
+  padding: 0 20px 20px 20px;
+}
+
+.btn-primary {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #45a049;
+}
+
+.btn-secondary {
+  background-color: #555;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #666;
 }

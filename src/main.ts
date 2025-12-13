@@ -6,6 +6,10 @@ import { logger } from './logger';
 import { processThumbnailRequest, processThumbnailBatch, ThumbnailRequest } from './thumbnail-generator';
 import { getCacheSize } from './cache-utils';
 import { runCacheEviction, clearAllCache, startPeriodicEviction } from './cache-eviction';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execPromise = promisify(exec);
 
 let mainWindow: BrowserWindow | null = null;
 let currentDirectory: string | null = null;
@@ -225,6 +229,52 @@ ipcMain.handle('get-image-metadata', async (event, imagePaths: string[]) => {
   } catch (error) {
     logger.error('Error obteniendo metadatos de imágenes', error);
     return [];
+  }
+});
+
+// Obtener orden de imágenes por fecha usando PowerShell (Explorer Date)
+ipcMain.handle('get-explorer-date-order', async (event, directoryPath: string, descending: boolean) => {
+  logger.info('IPC: get-explorer-date-order', { directoryPath, descending });
+  try {
+    const scriptPath = path.join(__dirname, '../scripts/get-explorer-date-order.ps1');
+    const descendingFlag = descending ? '-Descending' : '';
+    const command = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -FolderPath "${directoryPath}" ${descendingFlag}`;
+    
+    const { stdout, stderr } = await execPromise(command);
+    
+    if (stderr) {
+      logger.warn('PowerShell stderr:', stderr);
+    }
+    
+    // Parsear JSON devuelto por el script
+    const paths = JSON.parse(stdout.trim());
+    logger.info('Orden de Explorer obtenido', { count: Array.isArray(paths) ? paths.length : 0 });
+    
+    return paths;
+  } catch (error) {
+    logger.error('Error obteniendo orden de Explorer', error);
+    return null;
+  }
+});
+
+// Organizar imágenes por año
+ipcMain.handle('organize-by-year', async (event, directoryPath: string) => {
+  logger.info('IPC: organize-by-year', { directoryPath });
+  try {
+    const scriptPath = path.join(__dirname, '../scripts/organize-by-year.ps1');
+    const command = `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -sourceDir "${directoryPath}"`;
+    
+    const { stdout, stderr } = await execPromise(command);
+    
+    if (stderr) {
+      logger.warn('PowerShell stderr:', stderr);
+    }
+    
+    logger.info('Organización por año completada', { output: stdout.trim() });
+    return { success: true, message: stdout.trim() };
+  } catch (error) {
+    logger.error('Error organizando por año', error);
+    return { success: false, error: String(error) };
   }
 });
 

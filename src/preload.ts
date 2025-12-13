@@ -7,6 +7,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-images-from-directory', directoryPath),
   getImageMetadata: (imagePaths: string[]) => 
     ipcRenderer.invoke('get-image-metadata', imagePaths),
+  getExplorerDateOrder: (directoryPath: string, descending: boolean) =>
+    ipcRenderer.invoke('get-explorer-date-order', directoryPath, descending),
+  organizeByYear: (directoryPath: string) =>
+    ipcRenderer.invoke('organize-by-year', directoryPath),
   getSubdirectories: (directoryPath: string) => 
     ipcRenderer.invoke('get-subdirectories', directoryPath),
   generateThumbnail: (request: any) => 

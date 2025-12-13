@@ -132,10 +132,17 @@
             <path d="M12 2L8 6h3v4H7V7L3 11l4 4v-3h4v4H8l4 4 4-4h-3v-4h4v3l4-4-4-4v3h-4V6h3z"/>
           </svg>
         </button>
+        <div class="toolbar-separator"></div>
         <button class="toolbar-btn" id="multi-select-btn" title="Modo selección múltiple (ESC para salir)">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 11l3 3L22 4"></path>
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+        </button>
+        <button class="toolbar-btn" id="organize-by-year-btn" title="Organizar imágenes por año">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            <text x="12" y="16" font-size="8" text-anchor="middle" fill="currentColor" stroke="none" font-weight="bold">2025</text>
           </svg>
         </button>
         <div class="toolbar-separator"></div>
@@ -158,8 +165,10 @@
             <div class="filter-menu" id="filter-menu">
               <button class="filter-option active" data-sort="name-asc">A → Z</button>
               <button class="filter-option" data-sort="name-desc">Z → A</button>
-              <button class="filter-option" data-sort="date-asc">Fecha (antigua)</button>
-              <button class="filter-option" data-sort="date-desc">Fecha (reciente)</button>
+              <button class="filter-option" data-sort="created-asc">Fecha creación (antigua)</button>
+              <button class="filter-option" data-sort="created-desc">Fecha creación (reciente)</button>
+              <button class="filter-option" data-sort="date-asc">Fecha de descarga (antigua) (beta)</button>
+              <button class="filter-option" data-sort="date-desc">Fecha de descarga (reciente) (beta)</button>
               <button class="filter-option" data-sort="size-asc">Tamaño (menor)</button>
               <button class="filter-option" data-sort="size-desc">Tamaño (mayor)</button>
             </div>
@@ -171,6 +180,12 @@
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>
         <p class="instruction-text">Haz click aquí para seleccionar el directorio a organizar</p>
+      </div>
+      
+      <!-- Barra de carga -->
+      <div class="loading-overlay" id="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p class="loading-text" id="loading-text">Procesando...</p>
       </div>
       
       <div class="image-view" id="image-view" style="display: none;">
@@ -188,8 +203,8 @@
         <div class="carousel-container" id="carousel-container">
           <button class="carousel-nav carousel-nav-first" id="carousel-nav-first" aria-label="Primera">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="11 18 5 12 11 6"></polyline>
-              <line x1="5" y1="6" x2="5" y2="18"></line>
+              <line x1="6" y1="6" x2="6" y2="18"></line>
+              <polyline points="17 6 11 12 17 18"></polyline>
             </svg>
           </button>
           
@@ -213,8 +228,8 @@
           
           <button class="carousel-nav carousel-nav-last" id="carousel-nav-last" aria-label="Última">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="13 18 19 12 13 6"></polyline>
-              <line x1="19" y1="6" x2="19" y2="18"></line>
+              <line x1="18" y1="6" x2="18" y2="18"></line>
+              <polyline points="7 6 13 12 7 18"></polyline>
             </svg>
           </button>
         </div>
@@ -225,7 +240,9 @@
   <!-- Modal para nueva carpeta -->
   <div class="modal-overlay" id="new-folder-modal" style="display: none;">
     <div class="modal-content">
-      <h3>Nueva carpeta</h3>
+      <div class="modal-header">
+        <h3>Nueva carpeta</h3>
+      </div>
       <div class="modal-body">
         <label for="folder-name-input">Nombre de la carpeta:</label>
         <div class="input-group">
@@ -239,7 +256,9 @@
   <!-- Modal para conflictos de archivos duplicados -->
   <div class="modal-overlay" id="conflict-modal" style="display: none;">
     <div class="modal-content conflict-modal">
-      <h3>Reemplazar u omitir archivos</h3>
+      <div class="modal-header">
+        <h3>Reemplazar u omitir archivos</h3>
+      </div>
       <div class="modal-body">
         <p class="conflict-description">El destino ya tiene un archivo denominado "<span id="conflict-filename"></span>"</p>
         
@@ -289,6 +308,27 @@
         
         <div class="conflict-actions">
           <p class="conflict-instruction">Elige cuál imagen conservar en el directorio destino con un click o puedes <button class="btn-secondary" id="keep-both-btn">Mantener ambos</button></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal organizar por año -->
+  <div class="modal" id="organize-year-modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>Organizar por año</h2>
+      </div>
+      <div class="modal-body-year">
+        <p style="font-size: 16px; line-height: 1.6; margin: 20px 0; color: #ffffff;">
+          ¿Deseas organizar las imágenes de esta carpeta en subdirectorios según su año de captura?
+        </p>
+        <p style="font-size: 14px; color: #aaaaaa; margin-bottom: 30px;">
+          Se crearán carpetas automáticamente (por ejemplo: 2023, 2024, 2025) y las imágenes se moverán según su fecha.
+        </p>
+        <div style="display: flex; gap: 15px; justify-content: flex-end;">
+          <button class="btn-secondary" id="organize-year-no-btn">No</button>
+          <button class="btn-primary" id="organize-year-yes-btn">Sí, organizar</button>
         </div>
       </div>
     </div>

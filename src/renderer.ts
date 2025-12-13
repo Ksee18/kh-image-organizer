@@ -37,7 +37,7 @@ let generatingThumbnails: number = 0;
 let isGeneratingBatch: boolean = false;
 
 // Sistema de filtros
-type SortOrder = 'name-asc' | 'name-desc' | 'date-asc' | 'date-desc' | 'size-asc' | 'size-desc';
+type SortOrder = 'name-asc' | 'name-desc' | 'created-asc' | 'created-desc' | 'date-asc' | 'date-desc' | 'size-asc' | 'size-desc';
 let currentSortOrder: SortOrder = 'name-asc';
 
 const MIN_ZOOM = 0.1;
@@ -49,6 +49,9 @@ const MAX_CONCURRENT_THUMBNAILS = 3;
 // Elementos del DOM  
 const viewer = document.getElementById('viewer') as HTMLElement;
 const emptyState = document.getElementById('empty-state') as HTMLElement;
+const emptyStateText = emptyState.querySelector('.instruction-text') as HTMLParagraphElement;
+const loadingOverlay = document.getElementById('loading-overlay') as HTMLElement;
+const loadingText = document.getElementById('loading-text') as HTMLElement;
 const imageView = document.getElementById('image-view') as HTMLElement;
 const mainImageContainer = document.getElementById('main-image-container') as HTMLElement;
 const currentImage = document.getElementById('current-image') as HTMLImageElement;
@@ -79,10 +82,16 @@ const zoomResetBtn = document.getElementById('zoom-reset-btn') as HTMLButtonElem
 const fitToWindowBtn = document.getElementById('fit-to-window-btn') as HTMLButtonElement;
 const toggleDragModeBtn = document.getElementById('toggle-drag-mode-btn') as HTMLButtonElement;
 const multiSelectBtn = document.getElementById('multi-select-btn') as HTMLButtonElement;
+const organizeByYearBtn = document.getElementById('organize-by-year-btn') as HTMLButtonElement;
 
 // Filtro
 const filterBtn = document.getElementById('filter-btn') as HTMLButtonElement;
 const filterMenu = document.getElementById('filter-menu') as HTMLElement;
+
+// Modal organizar por año
+const organizeYearModal = document.getElementById('organize-year-modal') as HTMLElement;
+const organizeYearYesBtn = document.getElementById('organize-year-yes-btn') as HTMLButtonElement;
+const organizeYearNoBtn = document.getElementById('organize-year-no-btn') as HTMLButtonElement;
 
 const THUMBNAIL_SIZE = 84;
 
@@ -103,6 +112,15 @@ if (windowCloseBtn) {
   windowCloseBtn.addEventListener('click', () => {
     window.electronAPI.windowClose();
   });
+}
+
+// Actualizar el mensaje del empty-state
+function updateEmptyStateMessage(hasDirectory: boolean) {
+  if (hasDirectory) {
+    emptyStateText.textContent = 'Este directorio no tiene imágenes, prueba cambiar a otro';
+  } else {
+    emptyStateText.textContent = 'Haz click aquí para seleccionar el directorio a organizar';
+  }
 }
 
 async function openDirectory() {
@@ -174,7 +192,7 @@ async function loadDirectory(directoryPath: string) {
       metadata.forEach((m: any) => imageMetadata.set(m.path, m));
       
       // Ordenar según filtro actual
-      sortImages();
+      await sortImages();
       
       currentImageIndex = 0;
       console.log('[RENDERER] currentImageIndex establecido a:', currentImageIndex);
@@ -183,6 +201,12 @@ async function loadDirectory(directoryPath: string) {
       imageView.style.display = 'flex';
       showImage(currentImages[currentImageIndex]);
       await initializeCarousel();
+    } else {
+      // No hay imágenes en el directorio
+      console.log('[RENDERER] No hay imágenes en el directorio');
+      imageView.style.display = 'none';
+      updateEmptyStateMessage(true);
+      emptyState.style.display = 'flex';
     }
   } catch (error) {
     console.error('[Renderer] Error:', error);
@@ -475,6 +499,7 @@ function closeDirectory() {
   thumbnailGenerationQueue.clear();
   isGeneratingBatch = false;
   
+  updateEmptyStateMessage(false);
   emptyState.style.display = 'flex';
   imageView.style.display = 'none';
   subdirectoriesList.innerHTML = '<p class="empty-message">No hay directorio abierto</p>';
@@ -495,30 +520,75 @@ function formatFileSize(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
 }
 
-function sortImages() {
-  currentImages.sort((a, b) => {
-    const metaA = imageMetadata.get(a);
-    const metaB = imageMetadata.get(b);
+function showLoading(message: string = 'Procesando...') {
+  loadingText.textContent = message;
+  loadingOverlay.style.display = 'flex';
+  imageView.style.display = 'none';
+}
+
+function hideLoading() {
+  loadingOverlay.style.display = 'none';
+  if (currentImages.length > 0) {
+    imageView.style.display = 'flex';
+  }
+}
+
+async function sortImages() {
+  // Para ordenamiento por fecha de descarga (beta), usar PowerShell con Explorer Date
+  if (currentSortOrder === 'date-asc' || currentSortOrder === 'date-desc') {
+    if (!currentDirectory) return;
     
-    if (!metaA || !metaB) return 0;
+    console.log('[Renderer] Ordenando por fecha de descarga con Explorer...');
+    showLoading('Ordenando por fecha de descarga...');
     
-    switch (currentSortOrder) {
-      case 'name-asc':
-        return metaA.name.localeCompare(metaB.name, undefined, { numeric: true });
-      case 'name-desc':
-        return metaB.name.localeCompare(metaA.name, undefined, { numeric: true });
-      case 'date-asc':
-        return metaA.createdTime - metaB.createdTime;
-      case 'date-desc':
-        return metaB.createdTime - metaA.createdTime;
-      case 'size-asc':
-        return metaA.size - metaB.size;
-      case 'size-desc':
-        return metaB.size - metaA.size;
-      default:
-        return 0;
+    try {
+      const descending = currentSortOrder === 'date-desc';
+      const sortedPaths = await window.electronAPI.getExplorerDateOrder(currentDirectory, descending);
+      
+      if (sortedPaths && Array.isArray(sortedPaths)) {
+        // Reordenar currentImages según el orden devuelto por PowerShell
+        const pathSet = new Set(sortedPaths);
+        currentImages = sortedPaths.filter(p => currentImages.includes(p));
+        console.log('[Renderer] Imágenes ordenadas por Explorer Date');
+      } else {
+        console.warn('[Renderer] No se pudo obtener orden de Explorer, usando fallback');
+        // Fallback al ordenamiento normal
+        currentImages.sort((a, b) => {
+          const metaA = imageMetadata.get(a);
+          const metaB = imageMetadata.get(b);
+          if (!metaA || !metaB) return 0;
+          return descending ? metaB.createdTime - metaA.createdTime : metaA.createdTime - metaB.createdTime;
+        });
+      }
+    } finally {
+      hideLoading();
     }
-  });
+  } else {
+    // Ordenamiento normal para nombre, tamaño y fecha de creación
+    currentImages.sort((a, b) => {
+      const metaA = imageMetadata.get(a);
+      const metaB = imageMetadata.get(b);
+      
+      if (!metaA || !metaB) return 0;
+      
+      switch (currentSortOrder) {
+        case 'name-asc':
+          return metaA.name.localeCompare(metaB.name, undefined, { numeric: true });
+        case 'name-desc':
+          return metaB.name.localeCompare(metaA.name, undefined, { numeric: true });
+        case 'created-asc':
+          return metaA.createdTime - metaB.createdTime;
+        case 'created-desc':
+          return metaB.createdTime - metaA.createdTime;
+        case 'size-asc':
+          return metaA.size - metaB.size;
+        case 'size-desc':
+          return metaB.size - metaA.size;
+        default:
+          return 0;
+      }
+    });
+  }
 }
 
 // Navegar al directorio padre
@@ -1305,6 +1375,67 @@ if (multiSelectBtn) {
   });
 }
 
+// Event listener para el botón de organizar por año
+if (organizeByYearBtn) {
+  organizeByYearBtn.addEventListener('click', () => {
+    if (organizeYearModal) {
+      organizeYearModal.style.display = 'flex';
+    }
+  });
+}
+
+// Event listeners para el modal de organizar por año
+if (organizeYearNoBtn) {
+  organizeYearNoBtn.addEventListener('click', () => {
+    if (organizeYearModal) {
+      organizeYearModal.style.display = 'none';
+    }
+  });
+}
+
+if (organizeYearYesBtn) {
+  organizeYearYesBtn.addEventListener('click', async () => {
+    if (!currentDirectory) {
+      console.warn('[Renderer] No hay directorio actual para organizar');
+      return;
+    }
+    
+    if (organizeYearModal) {
+      organizeYearModal.style.display = 'none';
+    }
+    
+    console.log('[Renderer] Organizando por año...', currentDirectory);
+    showLoading('Organizando imágenes por año...');
+    
+    try {
+      const result = await window.electronAPI.organizeByYear(currentDirectory);
+      
+      if (result.success) {
+        console.log('[Renderer] Organización completada:', result.message);
+        // Recargar el directorio para mostrar las nuevas carpetas de año
+        await loadDirectory(currentDirectory);
+      } else {
+        console.error('[Renderer] Error en organización:', result.error);
+        alert('Error al organizar archivos: ' + result.error);
+      }
+    } catch (error) {
+      console.error('[Renderer] Error organizando por año:', error);
+      alert('Error al organizar archivos');
+    } finally {
+      hideLoading();
+    }
+  });
+}
+
+// Cerrar modal al hacer clic fuera del contenido
+if (organizeYearModal) {
+  organizeYearModal.addEventListener('click', (e) => {
+    if (e.target === organizeYearModal) {
+      organizeYearModal.style.display = 'none';
+    }
+  });
+}
+
 // Event listeners para el dropdown de filtros
 if (filterBtn && filterMenu) {
   // Marcar opción por defecto como activa
@@ -1327,7 +1458,7 @@ if (filterBtn && filterMenu) {
   // Manejar selección de opciones de filtro
   const filterOptions = filterMenu.querySelectorAll('.filter-option');
   filterOptions.forEach(option => {
-    option.addEventListener('click', (e) => {
+    option.addEventListener('click', async (e) => {
       e.stopPropagation();
       
       const sortOrder = option.getAttribute('data-sort') as 'name-asc' | 'name-desc' | 'date-asc' | 'date-desc' | 'size-asc' | 'size-desc';
@@ -1345,7 +1476,7 @@ if (filterBtn && filterMenu) {
       
       // Reordenar y recargar carousel
       if (currentImages.length > 0) {
-        sortImages();
+        await sortImages();
         initializeCarousel();
         showImage(currentImages[currentImageIndex]);
       }

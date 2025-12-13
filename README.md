@@ -25,6 +25,8 @@ Navigate effortlessly through your image collection using keyboard shortcuts, mo
 - **File Associations**: Opens all common image formats (.jpg, .png, .gif, .bmp, .webp, .svg, .ico, .tiff)
 - **Sorting by Date, Size, Name**: Choose the order in which you want your images to be displayed.
 - **Bulk Image Movement**: If you want to move multiple images to a directory, avoid moving them one by one by selecting all at once.
+- **Automatic Organization by Year**: In a folder with many images like photos from your smartphone, if you just want them organized by year, we have an option to do it automatically.
+
 
 #### 🖼️ Main Interface Components
 - **Sidebar**: Browse subdirectories and navigate folder structure. Add destination folders from any location, including different drives
@@ -55,6 +57,7 @@ When moving files to destinations where duplicates exist:
 | `Supr` / `Delete` | Delete current image |
 | `Middle Mouse Button` | Toggle between move mode and reposition mode |
 | `Horizontal Scroll` | Navigate between images (mice with side buttons) |
+| `CTRL` | Activates the multiple selection mode |
 
 ### 📦 Installation
 
@@ -138,6 +141,7 @@ Navega sin esfuerzo a través de tu colección de imágenes usando atajos de tec
 - **Asociaciones de Archivos**: Abre todos los formatos de imagen comunes (.jpg, .png, .gif, .bmp, .webp, .svg, .ico, .tiff)
 - **Ordenamiento por Fecha, Tamaño, Nombre**: Elige el orden en el cual quieres que se muestren tus imagenes.
 - **Movimiento masivo de imagenes**: Si quieres mover multiples imagenes a un directorio evita moverlas de una por una seleccionando todas de una vez.
+- **Organizacion automatica por año**: En una carpeta con muchas imagenes como las fotos de tu smartphome, si solo quieres que se ordenen por año tenemos una opcion para hacerlo en automatico.
 
 #### 🖼️ Componentes Principales de la Interfaz
 - **Sidebar**: Explora subdirectorios y navega por la estructura de carpetas. Agrega carpetas de destino desde cualquier ubicación, incluyendo diferentes discos
@@ -168,6 +172,7 @@ Cuando se mueven archivos a destinos donde existen duplicados:
 | `Supr` / `Delete` | Eliminar imagen actual |
 | `Botón central del mouse` | Toggle entre modo mover y modo reposicionar |
 | `Scroll horizontal` | Navegación entre imágenes (ratones con botones laterales) |
+| `CTRL` | ACtiva el modo de seleccion multiple |
 
 ### 📦 Instalación
 

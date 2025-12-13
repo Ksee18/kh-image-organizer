@@ -4,6 +4,141 @@ Registro de cambios y evolución del proyecto **KH Image Organizer**.
 
 ---
 
+## [1.1.0] - 2024-12-12
+
+### 🎉 Actualización Mayor - Modo Multi-Selección y Mejoras Visuales
+
+### ✨ Nuevas Características
+
+#### 🖱️ Modo Multi-Selección (SM)
+- **Activación del Modo SM**: Nuevo botón en toolbar para entrar/salir del modo de selección múltiple
+  - Indicador visual: Botón verde cuando está activo
+  - Atajo: Tecla `ESC` para salir del modo
+- **Selección de Imágenes**:
+  - Click para seleccionar/deseleccionar imágenes individuales
+  - Long-press (mantener click) para selección rápida
+  - Indicador visual: Checkmark verde en miniaturas seleccionadas
+  - Visor de miniaturas flotante con contador de imágenes seleccionadas
+- **Operaciones en Batch**:
+  - Movimiento de múltiples imágenes simultáneamente
+  - Sistema de cola para manejo de conflictos secuenciales
+  - Proceso automático de conflictos uno por uno
+- **Deshabilitar Funciones**: Zoom, drag mode y otros controles se deshabilitan automáticamente en modo SM
+
+#### 📅 Organización por Año
+- **Script PowerShell**: Nuevo sistema para organizar imágenes automáticamente por año
+  - Usa fecha de creación o modificación (la más antigua)
+  - Crea carpetas automáticamente por año (ej: 2023, 2024, 2025)
+  - Manejo inteligente de conflictos con numeración automática
+  - Solo procesa archivos de imagen
+- **Botón de Organización**: Nuevo botón en toolbar con ícono de carpeta y año actual
+- **Modal de Confirmación**: Diálogo con explicación clara antes de organizar
+
+#### 🗓️ Ordenamiento por Fecha de Descarga
+- **Script PowerShell Avanzado**: Integración con Shell.Application de Windows
+  - Lee el campo "Fecha" exacto de Windows Explorer usando metadatos EXIF
+  - Coincide 90% con el orden de Windows Explorer
+  - Opción beta claramente marcada por ser más lenta
+- **Nuevas Opciones de Filtrado**:
+  - **Fecha creación (antigua/reciente)**: Ordenamiento rápido por birthtimeMs
+  - **Fecha de descarga (antigua/reciente) (beta)**: Ordenamiento preciso con PowerShell
+- **Loading Overlay**: Indicador visual durante operaciones lentas de ordenamiento
+
+#### 🎨 Mejoras Visuales de Modales
+- **Cabeceras Estilizadas**: Nuevo diseño con patrón de cuadrícula generado con CSS
+  - Background pattern de https://www.magicpattern.design/tools/css-backgrounds
+  - Colores: `#f2f2ff` con líneas `#d4d4e6`
+  - Texto en negro oscuro (`#1a1a1a`) para mejor legibilidad
+- **Modales Actualizados**:
+  - Modal de conflictos de archivos
+  - Modal de nueva carpeta
+  - Modal de organización por año
+- **Mejoras de UX**: Textos en blanco para mejor contraste en fondos oscuros
+
+### 🔧 Mejoras y Correcciones
+
+#### 🖱️ Navegación del Carrusel
+- **Navegación con Rueda del Mouse**: Scroll horizontal sobre el carrusel
+  - Detección de eventos `wheel` con `deltaY`
+  - Navegación suave entre imágenes
+- **Nuevos Botones de Navegación**:
+  - **Primera imagen**: Nuevo ícono más claro (línea vertical + flecha)
+  - **Última imagen**: Nuevo ícono más claro (flecha + línea vertical)
+  - Iconos rediseñados para mejor visibilidad y comprensión
+
+#### 🐛 Corrección: Error EXDEV en Movimientos Entre Particiones
+- **Problema**: Error al mover archivos entre discos/particiones diferentes
+- **Solución**: Sistema de fallback automático
+  - Intenta `rename()` primero (rápido)
+  - Si falla con EXDEV, usa copy + delete (seguro)
+  - Manejo transparente sin intervención del usuario
+
+#### 🐛 Corrección: Conflictos en Operaciones SM Bulk
+- **Problema**: Conflictos múltiples simultáneos causaban inconsistencias
+- **Solución**: Sistema de cola de conflictos
+  - Array `pendingConflicts[]` para almacenar conflictos pendientes
+  - Flag `isProcessingConflicts` para control de flujo
+  - Procesamiento secuencial: un conflicto a la vez
+  - Continuación automática tras resolver cada conflicto
+
+#### 📱 Mejoras de Diseño Responsivo
+- **Sidebar**: Optimizada para resoluciones pequeñas
+  - Mejor manejo de overflow
+  - Controles sticky ajustados
+- **Toolbar**: Mejoras horizontales en pantallas reducidas
+  - Iconos y espaciado optimizado
+  - Mejor distribución de elementos
+
+#### 📝 Mensajes Contextuales
+- **Empty State Mejorado**: Mensajes diferentes según contexto
+  - Sin directorio: "Haz click aquí para seleccionar el directorio a organizar"
+  - Directorio vacío: "Este directorio no tiene imágenes, prueba cambiar a otro"
+
+### 🔑 Nuevos Atajos de Teclado
+- `CTRL`: Entrar al modo multi-selección (SM)
+- `ESC`: Salir del modo multi-selección (SM)
+
+### 🎮 Interacciones del Mouse Mejoradas
+- `Scroll sobre carrusel`: Navegación horizontal entre imágenes
+- `Click en miniatura (SM)`: Seleccionar/deseleccionar imagen
+- `Long-press en miniatura (SM)`: Selección rápida continua
+
+### 📋 Arquitectura y Mejoras Técnicas
+
+#### Scripts PowerShell
+- **get-explorer-date-order.ps1**: 
+  - Acceso a Shell.Application para metadatos exactos de Windows
+  - Parsing de fechas EXIF con formato MM/dd/yyyy
+  - Fallback a birthtimeMs y mtimeMs
+  - Output en formato JSON para integración con Electron
+- **organize-by-year.ps1**:
+  - Filtrado por extensiones de imagen
+  - Función `Get-Year` para fecha más antigua
+  - Creación automática de directorios
+  - Manejo de conflictos con sufijos numéricos
+
+#### IPC Handlers
+- `get-explorer-date-order`: Ejecuta script PS1 para ordenamiento por fecha de descarga
+- `organize-by-year`: Ejecuta script PS1 para organización automática por año
+
+#### Tipos TypeScript Extendidos
+- `SortOrder`: Nuevos valores `'created-asc' | 'created-desc'` para ordenamiento rápido
+- `ElectronAPI`: Nueva función `organizeByYear(directoryPath: string)`
+
+### 🎨 Estilos CSS Nuevos
+- `.modal-header`: Cabecera con patrón de cuadrícula
+- `.modal-body-year`: Contenedor específico para modal de organización
+- `.loading-overlay` y `.loading-spinner`: Indicadores de carga durante operaciones lentas
+- `.multi-select-thumbnails`: Visor flotante de imágenes seleccionadas
+- `.multi-select-thumbnail-item`: Estilo para miniaturas con checkmark
+
+### 📦 Distribución
+- **Versión**: 1.1.0
+- **Build**: Incluye scripts PowerShell en carpeta `scripts/`
+- **Compatibilidad**: Windows 10/11 con PowerShell
+
+---
+
 ## [1.0.0] - 2024-12-09
 
 ### 🎉 Lanzamiento Inicial
@@ -114,19 +249,17 @@ Primera versión funcional de KH Image Organizer.
 
 ## 🚀 Próximas Versiones
 
-### [1.1.0] - Planificado
-- **Multi-Select Mode (SM)**: Próxima característica principal
-  - Selección de múltiples imágenes simultáneamente
-  - Movimiento en batch de imágenes seleccionadas
-  - UI de miniaturas para imágenes seleccionadas
-  - Manejo de conflictos para operaciones múltiples
-  - Drag & drop para selección visual
-  - Contador de imágenes seleccionadas
+### [1.2.0] - Planificado
+- **Función de Deshacer**: Botón en toolbar para revertir el último movimiento de imágenes
+  - Restauración de archivos a su ubicación original
+  - Historial de operaciones recientes
   
 ### Futuro
-- Idioma ingles
-- Temas claro de interfaz
-- Organizacion masiva del directorio actual separado por año de creacion.
+- Idioma inglés
+- Tema claro de interfaz
+- Vista de calendario para organización temporal
+- Edición básica de imágenes (rotar, recortar)
+- Exportación de selecciones a ZIP
 
 ---
 
