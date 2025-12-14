@@ -33,6 +33,31 @@ export interface MoveFileResult {
   error?: string;
 }
 
+export interface ImageHash {
+  path: string;
+  hash: string;
+  mtime: number;
+}
+
+export interface DuplicateGroup {
+  hash: string;
+  images: string[];
+  distance: number;
+}
+
+export interface DuplicateComparison {
+  leftImage: string;
+  rightImage: string;
+  groupIndex: number;
+}
+
+export interface HashProgress {
+  current: number;
+  total: number;
+  phase: 'hashing' | 'comparing';
+  percentage?: number;
+}
+
 export interface ElectronAPI {
   openDirectoryDialog: () => Promise<string | null>;
   getImagesFromDirectory: (directoryPath: string) => Promise<string[]>;
@@ -50,6 +75,11 @@ export interface ElectronAPI {
   moveToTrash: (filePath: string) => Promise<boolean>;
   moveFile: (filePath: string, targetDirectory: string, newFileName?: string) => Promise<MoveFileResult>;
   deleteFile: (filePath: string) => Promise<boolean>;
+  calculateHashes: (directoryPath: string, onProgress: (progress: HashProgress) => void) => Promise<ImageHash[]>;
+  findDuplicates: (hashes: ImageHash[], onProgress: (progress: HashProgress) => void) => Promise<DuplicateGroup[]>;
+  getHashCacheSize: (directoryPath: string) => Promise<number>;
+  saveHashCache: (directoryPath: string, hashes: ImageHash[]) => Promise<boolean>;
+  clearHashCache: (directoryPath: string) => Promise<boolean>;
   windowMinimize: () => void;
   windowMaximize: () => void;
   windowClose: () => void;
@@ -58,6 +88,7 @@ export interface ElectronAPI {
   onDestinationDirectoriesUpdated: (callback: (directories: string[]) => void) => void;
   onOpenWithFile: (callback: (filePath: string) => void) => void;
 }
+
 
 declare global {
   interface Window {

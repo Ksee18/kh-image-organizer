@@ -26,6 +26,8 @@ Navigate effortlessly through your image collection using keyboard shortcuts, mo
 - **Sorting by Date, Size, Name**: Choose the order in which you want your images to be displayed.
 - **Bulk Image Movement**: If you want to move multiple images to a directory, avoid moving them one by one by selecting all at once.
 - **Automatic Organization by Year**: In a folder with many images like photos from your smartphone, if you just want them organized by year, we have an option to do it automatically.
+- **Duplicate Image Scanning**: Evaluates all images in a directory and its subfolders to search for duplicate images, helping you save storage space.
+
 
 
 #### 🖼️ Main Interface Components
@@ -96,6 +98,7 @@ release/KH Image Organizer-win32-x64/KH Image Organizer.exe
 - **Electron** 39.2.6 - Desktop application framework
 - **TypeScript** 5.9.3 - Type-safe development
 - **Sharp** 0.34.5 - High-performance image processing
+- **image-hash** 7.0.1 - Perceptual image hashing for duplicate detection
 - **Native Modules**: Optimized for Windows x64
 
 ### 🚧 Upcoming Features
@@ -142,6 +145,7 @@ Navega sin esfuerzo a través de tu colección de imágenes usando atajos de tec
 - **Ordenamiento por Fecha, Tamaño, Nombre**: Elige el orden en el cual quieres que se muestren tus imagenes.
 - **Movimiento masivo de imagenes**: Si quieres mover multiples imagenes a un directorio evita moverlas de una por una seleccionando todas de una vez.
 - **Organizacion automatica por año**: En una carpeta con muchas imagenes como las fotos de tu smartphome, si solo quieres que se ordenen por año tenemos una opcion para hacerlo en automatico.
+- **Busqueda de imagenes duplicadas**: Evalua todas las imagenes de un directorio y sus carpetas para buscar por imagenes repetidas para ayudarte a ahorrar espacio.
 
 #### 🖼️ Componentes Principales de la Interfaz
 - **Sidebar**: Explora subdirectorios y navega por la estructura de carpetas. Agrega carpetas de destino desde cualquier ubicación, incluyendo diferentes discos
@@ -172,7 +176,7 @@ Cuando se mueven archivos a destinos donde existen duplicados:
 | `Supr` / `Delete` | Eliminar imagen actual |
 | `Botón central del mouse` | Toggle entre modo mover y modo reposicionar |
 | `Scroll horizontal` | Navegación entre imágenes (ratones con botones laterales) |
-| `CTRL` | ACtiva el modo de seleccion multiple |
+| `CTRL` | Activa el modo de seleccion multiple |
 
 ### 📦 Instalación
 
@@ -211,6 +215,7 @@ release/KH Image Organizer-win32-x64/KH Image Organizer.exe
 - **Electron** 39.2.6 - Framework de aplicación de escritorio
 - **TypeScript** 5.9.3 - Desarrollo con tipado seguro
 - **Sharp** 0.34.5 - Procesamiento de imágenes de alto rendimiento
+- **image-hash** 7.0.1 - Hashing perceptual de imágenes para detección de duplicados
 - **Módulos Nativos**: Optimizado para Windows x64
 
 ### 🚧 Características Próximas

@@ -8,6 +8,7 @@ import { getCacheSize } from './cache-utils';
 import { runCacheEviction, clearAllCache, startPeriodicEviction } from './cache-eviction';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+const { imageHash } = require('image-hash');
 
 const execPromise = promisify(exec);
 
@@ -453,6 +454,309 @@ ipcMain.handle('delete-file', async (event, filePath: string) => {
     return true;
   } catch (error) {
     logger.error('Error eliminando archivo', error);
+    return false;
+  }
+});
+
+// ===== HANDLERS PARA ESCANEO DE DUPLICADOS =====
+
+// Calcular hashes de imágenes recursivamente
+ipcMain.handle('calculate-hashes', async (event, directoryPath: string) => {
+  logger.info('IPC: calculate-hashes', { directoryPath });
+  
+  try {
+    const imageExtensions = ['.jpg', '.jpeg', '.jfif', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+    const hashes: Array<{ path: string; hash: string; mtime: number }> = [];
+    
+    // Intentar cargar caché existente
+    const cacheDir = path.join(app.getPath('userData'), 'hash-cache');
+    const encodedDirName = Buffer.from(directoryPath).toString('base64').replace(/[/+=]/g, '_');
+    const cacheFilePath = path.join(cacheDir, `${encodedDirName}.json`);
+    
+    let cachedHashes: Map<string, { hash: string; mtime: number }> = new Map();
+    
+    try {
+      if (fs.existsSync(cacheFilePath)) {
+        const cacheData = await fsPromises.readFile(cacheFilePath, 'utf-8');
+        const parsedCache = JSON.parse(cacheData);
+        parsedCache.forEach((item: { path: string; hash: string; mtime: number }) => {
+          cachedHashes.set(item.path, { hash: item.hash, mtime: item.mtime });
+        });
+        logger.info('Caché de hashes cargado', { count: cachedHashes.size });
+      }
+    } catch (cacheError) {
+      logger.warn('No se pudo cargar caché de hashes', { error: cacheError });
+    }
+    
+    // Función recursiva para obtener todas las imágenes
+    async function getAllImages(dir: string): Promise<string[]> {
+      const images: string[] = [];
+      const items = await fsPromises.readdir(dir, { withFileTypes: true });
+      
+      for (const item of items) {
+        const fullPath = path.join(dir, item.name);
+        
+        if (item.isDirectory()) {
+          const subImages = await getAllImages(fullPath);
+          images.push(...subImages);
+        } else if (item.isFile()) {
+          const ext = path.extname(item.name).toLowerCase();
+          if (imageExtensions.includes(ext)) {
+            images.push(fullPath);
+          }
+        }
+      }
+      
+      return images;
+    }
+    
+    const allImages = await getAllImages(directoryPath);
+    logger.info('Imágenes encontradas para hash', { count: allImages.length });
+    
+    let successCount = 0;
+    let errorCount = 0;
+    let cacheHits = 0;
+    
+    // Calcular hash de cada imagen
+    for (let i = 0; i < allImages.length; i++) {
+      const imagePath = allImages[i];
+      
+      try {
+        // Verificar que el archivo existe y es legible
+        const stats = await fsPromises.stat(imagePath);
+        
+        // Verificar que el archivo no está vacío
+        if (stats.size === 0) {
+          logger.warn('Archivo vacío, saltando', { imagePath });
+          continue;
+        }
+        
+        // Verificar que el archivo es realmente una imagen válida
+        try {
+          await fsPromises.access(imagePath, fs.constants.R_OK);
+        } catch (accessError) {
+          logger.error('Archivo no accesible', { imagePath, error: accessError });
+          continue;
+        }
+        
+        let hash: string;
+        
+        // Verificar si tenemos un hash en caché y el archivo no ha sido modificado
+        const cached = cachedHashes.get(imagePath);
+        if (cached && Math.abs(cached.mtime - stats.mtimeMs) < 1000) {
+          // Usar hash del caché
+          hash = cached.hash;
+          cacheHits++;
+        } else {
+          // Calcular phash con timeout
+          hash = await new Promise<string>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('Timeout calculando hash (5s)'));
+            }, 5000); // 5 segundos timeout
+            
+            try {
+              imageHash(imagePath, 16, true, (error: Error | null, data: string) => {
+                clearTimeout(timeout);
+                if (error) {
+                  reject(error);
+                } else if (!data || data.length === 0) {
+                  reject(new Error('Hash vacío retornado'));
+                } else {
+                  resolve(data);
+                }
+              });
+            } catch (syncError) {
+              clearTimeout(timeout);
+              reject(syncError);
+            }
+          });
+        }
+        
+        hashes.push({
+          path: imagePath,
+          hash: hash,
+          mtime: stats.mtimeMs
+        });
+        
+        successCount++;
+        
+        // Enviar progreso al renderer
+        event.sender.send('hash-progress', {
+          current: i + 1,
+          total: allImages.length,
+          phase: 'hashing'
+        });
+        
+      } catch (error) {
+        errorCount++;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        // Solo logear si no es un error de mime type (muy común)
+        if (!errorMessage.includes('mime type or mismatch')) {
+          logger.error('Error calculando hash', { 
+            imagePath, 
+            error: errorMessage,
+            stack: errorStack
+          });
+        }
+        
+        // Continuar con la siguiente imagen
+        event.sender.send('hash-progress', {
+          current: i + 1,
+          total: allImages.length,
+          phase: 'hashing'
+        });
+      }
+    }
+    
+    logger.info('Hashes calculados', { 
+      count: hashes.length,
+      success: successCount,
+      errors: errorCount,
+      cacheHits: cacheHits,
+      calculated: successCount - cacheHits,
+      total: allImages.length
+    });
+    return hashes;
+    
+  } catch (error) {
+    logger.error('Error en calculate-hashes', error);
+    return [];
+  }
+});
+
+// Encontrar duplicados comparando hashes
+ipcMain.handle('find-duplicates', async (event, hashes: Array<{ path: string; hash: string; mtime: number }>) => {
+  logger.info('IPC: find-duplicates', { hashCount: hashes.length });
+  
+  try {
+    const duplicateGroups: Array<{ hash: string; images: string[]; distance: number }> = [];
+    const processed = new Set<number>();
+    
+    // Función para calcular distancia de Hamming
+    function hammingDistance(hash1: string, hash2: string): number {
+      let distance = 0;
+      for (let i = 0; i < hash1.length; i++) {
+        if (hash1[i] !== hash2[i]) distance++;
+      }
+      return distance;
+    }
+    
+    const totalComparisons = (hashes.length * (hashes.length - 1)) / 2;
+    let currentComparison = 0;
+    
+    // Comparar cada par de imágenes
+    for (let i = 0; i < hashes.length; i++) {
+      if (processed.has(i)) continue;
+      
+      const group: string[] = [hashes[i].path];
+      
+      for (let j = i + 1; j < hashes.length; j++) {
+        if (processed.has(j)) continue;
+        
+        const distance = hammingDistance(hashes[i].hash, hashes[j].hash);
+        
+        // Considerar duplicado si distancia <= 5
+        if (distance <= 5) {
+          group.push(hashes[j].path);
+          processed.add(j);
+        }
+        
+        currentComparison++;
+        
+        // Enviar progreso cada 100 comparaciones
+        if (currentComparison % 100 === 0) {
+          event.sender.send('hash-progress', {
+            current: currentComparison,
+            total: totalComparisons,
+            phase: 'comparing',
+            percentage: Math.round((currentComparison / totalComparisons) * 100)
+          });
+        }
+      }
+      
+      if (group.length > 1) {
+        duplicateGroups.push({
+          hash: hashes[i].hash,
+          images: group,
+          distance: 0
+        });
+      }
+      
+      processed.add(i);
+    }
+    
+    // Enviar progreso final
+    event.sender.send('hash-progress', {
+      current: totalComparisons,
+      total: totalComparisons,
+      phase: 'comparing',
+      percentage: 100
+    });
+    
+    logger.info('Duplicados encontrados', { groups: duplicateGroups.length });
+    return duplicateGroups;
+    
+  } catch (error) {
+    logger.error('Error en find-duplicates', error);
+    return [];
+  }
+});
+
+// Obtener tamaño del caché de hashes
+ipcMain.handle('get-hash-cache-size', async (event, directoryPath: string) => {
+  try {
+    const cacheDir = path.join(app.getPath('userData'), 'hash-cache');
+    const cacheFile = path.join(cacheDir, Buffer.from(directoryPath).toString('base64') + '.json');
+    
+    if (fs.existsSync(cacheFile)) {
+      const stats = await fsPromises.stat(cacheFile);
+      return stats.size;
+    }
+    
+    return 0;
+  } catch (error) {
+    logger.error('Error obteniendo tamaño de caché', error);
+    return 0;
+  }
+});
+
+// Guardar caché de hashes
+ipcMain.handle('save-hash-cache', async (event, directoryPath: string, hashes: Array<{ path: string; hash: string; mtime: number }>) => {
+  try {
+    const cacheDir = path.join(app.getPath('userData'), 'hash-cache');
+    
+    // Crear directorio si no existe
+    if (!fs.existsSync(cacheDir)) {
+      await fsPromises.mkdir(cacheDir, { recursive: true });
+    }
+    
+    const cacheFile = path.join(cacheDir, Buffer.from(directoryPath).toString('base64') + '.json');
+    await fsPromises.writeFile(cacheFile, JSON.stringify(hashes, null, 2));
+    
+    logger.info('Caché de hashes guardado', { cacheFile, count: hashes.length });
+    return true;
+  } catch (error) {
+    logger.error('Error guardando caché', error);
+    return false;
+  }
+});
+
+// Limpiar caché de hashes
+ipcMain.handle('clear-hash-cache', async (event, directoryPath: string) => {
+  try {
+    const cacheDir = path.join(app.getPath('userData'), 'hash-cache');
+    const cacheFile = path.join(cacheDir, Buffer.from(directoryPath).toString('base64') + '.json');
+    
+    if (fs.existsSync(cacheFile)) {
+      await fsPromises.unlink(cacheFile);
+      logger.info('Caché eliminado', { cacheFile });
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error('Error eliminando caché', error);
     return false;
   }
 });

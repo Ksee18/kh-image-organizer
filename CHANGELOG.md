@@ -4,6 +4,45 @@ Registro de cambios y evolución del proyecto **KH Image Organizer**.
 
 ---
 
+## [1.2.0] - 2025-12-13
+
+### 🎉 Actualización Mayor - Escaneo de Imágenes Duplicadas
+
+### ✨ Nuevas Características
+
+#### 🔍 Modo de Escaneo de Duplicados (ED)
+- **Detección Perceptual con phash**: Utiliza algoritmo de hashing perceptual para encontrar imágenes visualmente similares
+  - Librería: `image-hash` v7.0.1
+  - Algoritmo: phash (16-bit precision)
+  - Umbral de similitud: Hamming distance ≤ 5
+- **Sistema de Caché Inteligente**:
+  - Almacena hashes calculados para evitar recálculo
+  - Compara timestamps de modificación (mtime) para validez
+  - Ubicación: `userData/hash-cache/`
+  - Nombres de archivo: base64-encoded directory names
+- **Comparación Secuencial de Duplicados**:
+  - Modal de comparación lado a lado
+  - Grupos múltiples: A, B, C → compara A vs B, ganador vs C
+  - Contador de conflictos correcto desde el inicio
+  - Metadatos comparativos: tamaño, fecha, dimensiones
+- **Interfaz de Usuario**:
+  - Botón en toolbar con icono de reflejo (⬜ ┊┊ ⬜)
+  - Color morado (#9b59b6) para modo ED activo
+  - Contador rojo y en negrita para conflictos
+  - Tres opciones: Click izquierda/derecha para eliminar, "Mantener ambas"
+- **Optimización de Rendimiento**:
+  - Barra de progreso con porcentaje durante hashing
+  - Generación completa de cola de comparaciones para contador preciso
+  - Evita bucles infinitos al mantener ambas imágenes
+  - Salto automático de comparaciones ya evaluadas
+
+### 🐛 Correcciones
+- **Contador de conflictos**: Ahora muestra el número total correcto desde el inicio
+- **Mantener ambas**: Ya no entra en bucle con imágenes triplicadas/cuadriplicadas
+- **Comparaciones múltiples**: Sistema de exclusión para evitar re-evaluar imágenes conservadas
+
+---
+
 ## [1.1.0] - 2024-12-12
 
 ### 🎉 Actualización Mayor - Modo Multi-Selección y Mejoras Visuales

@@ -23,6 +23,14 @@ let justEnteredMultiSelect: boolean = false; // Flag para prevenir click despué
 let pendingConflicts: Array<{sourcePath: string, targetDirectory: string, targetPath: string}> = []; // Cola de conflictos pendientes
 let isProcessingConflicts: boolean = false; // Flag para saber si estamos procesando conflictos
 
+// Escaneo de duplicados (ED)
+let isDuplicateScanMode: boolean = false;
+let duplicateComparisons: Array<{leftImage: string, rightImage: string, groupIndex: number}> = [];
+let currentDuplicateIndex: number = 0;
+let calculatedHashes: Array<{path: string, hash: string, mtime: number}> = [];
+let duplicateScanCancelled: boolean = false;
+let duplicateGroups: Array<{hash: string, images: string[], distance: number}> = []; // Mantener grupos originales
+
 // Navegación rápida por directorios
 let lastPressedKey: string = '';
 let lastKeyPressTime: number = 0;
@@ -83,6 +91,7 @@ const fitToWindowBtn = document.getElementById('fit-to-window-btn') as HTMLButto
 const toggleDragModeBtn = document.getElementById('toggle-drag-mode-btn') as HTMLButtonElement;
 const multiSelectBtn = document.getElementById('multi-select-btn') as HTMLButtonElement;
 const organizeByYearBtn = document.getElementById('organize-by-year-btn') as HTMLButtonElement;
+const duplicateScanBtn = document.getElementById('duplicate-scan-btn') as HTMLButtonElement;
 
 // Filtro
 const filterBtn = document.getElementById('filter-btn') as HTMLButtonElement;
@@ -92,6 +101,37 @@ const filterMenu = document.getElementById('filter-menu') as HTMLElement;
 const organizeYearModal = document.getElementById('organize-year-modal') as HTMLElement;
 const organizeYearYesBtn = document.getElementById('organize-year-yes-btn') as HTMLButtonElement;
 const organizeYearNoBtn = document.getElementById('organize-year-no-btn') as HTMLButtonElement;
+
+// Modal escaneo de duplicados
+const duplicateScanModal = document.getElementById('duplicate-scan-modal') as HTMLElement;
+const duplicateScanLeftSection = document.getElementById('duplicate-scan-left-section') as HTMLElement;
+const duplicateScanRightSection = document.getElementById('duplicate-scan-right-section') as HTMLElement;
+const duplicateScanLeftImg = document.getElementById('duplicate-scan-left-img') as HTMLImageElement;
+const duplicateScanRightImg = document.getElementById('duplicate-scan-right-img') as HTMLImageElement;
+const duplicateScanLeftPath = document.getElementById('duplicate-scan-left-path') as HTMLElement;
+const duplicateScanRightPath = document.getElementById('duplicate-scan-right-path') as HTMLElement;
+const duplicateScanLeftInfo = document.getElementById('duplicate-scan-left-info') as HTMLElement;
+const duplicateScanRightInfo = document.getElementById('duplicate-scan-right-info') as HTMLElement;
+const duplicateKeepBothBtn = document.getElementById('duplicate-keep-both-btn') as HTMLButtonElement;
+const duplicateCancelScanBtn = document.getElementById('duplicate-cancel-scan-btn') as HTMLButtonElement;
+const duplicateCounter = document.querySelector('.duplicate-counter') as HTMLElement;
+
+// Log para debug
+console.log('[ED] Elementos del modal cargados:', {
+  modal: !!duplicateScanModal,
+  leftSection: !!duplicateScanLeftSection,
+  rightSection: !!duplicateScanRightSection,
+  leftImg: !!duplicateScanLeftImg,
+  rightImg: !!duplicateScanRightImg,
+  keepBothBtn: !!duplicateKeepBothBtn,
+  cancelBtn: !!duplicateCancelScanBtn
+});
+
+// Modal confirmación de caché
+const cacheConfirmModal = document.getElementById('cache-confirm-modal') as HTMLElement;
+const cacheConfirmText = document.getElementById('cache-size-info') as HTMLElement;
+const cacheSaveBtn = document.getElementById('cache-save-btn') as HTMLButtonElement;
+const cacheDontSaveBtn = document.getElementById('cache-dont-save-btn') as HTMLButtonElement;
 
 const THUMBNAIL_SIZE = 84;
 
@@ -1384,6 +1424,15 @@ if (organizeByYearBtn) {
   });
 }
 
+// Event listener para el botón de escaneo de duplicados
+if (duplicateScanBtn) {
+  duplicateScanBtn.addEventListener('click', async () => {
+    if (!isDuplicateScanMode) {
+      await startDuplicateScan();
+    }
+  });
+}
+
 // Event listeners para el modal de organizar por año
 if (organizeYearNoBtn) {
   organizeYearNoBtn.addEventListener('click', () => {
@@ -2366,4 +2415,633 @@ function enableControlsAfterMultiSelect() {
   if (filterBtn) filterBtn.disabled = false;
   
   console.log('[SM] Controles rehabilitados');
+}
+
+// ============================================
+// FUNCIONES DE ESCANEO DE DUPLICADOS (ED)
+// ============================================
+
+/**
+ * Inicia el modo de escaneo de duplicados
+ */
+async function startDuplicateScan() {
+  if (!currentDirectory) {
+    console.warn('[ED] No hay directorio seleccionado');
+    return;
+  }
+
+  console.log('[ED] Iniciando escaneo de duplicados en:', currentDirectory);
+  
+  // Activar modo ED
+  isDuplicateScanMode = true;
+  duplicateScanCancelled = false;
+  duplicateComparisons = [];
+  currentDuplicateIndex = 0;
+  calculatedHashes = [];
+  
+  // UI: Activar botón y deshabilitar controles
+  if (duplicateScanBtn) duplicateScanBtn.classList.add('active');
+  disableControlsDuringDuplicateScan();
+  
+  // Mostrar loading (NO ocultar viewer para que se vea el overlay)
+  showLoading('Calculando hashes...');
+  
+  try {
+    // Fase 1: Calcular hashes de todas las imágenes
+    console.log('[ED] Fase 1: Calculando hashes...');
+    calculatedHashes = await window.electronAPI.calculateHashes(
+      currentDirectory,
+      (progress) => {
+        if (duplicateScanCancelled) return;
+        const message = `Calculando hashes: ${progress.current} de ${progress.total}`;
+        updateLoadingText(message);
+      }
+    );
+    
+    if (duplicateScanCancelled) {
+      console.log('[ED] Escaneo cancelado durante cálculo de hashes');
+      await finishDuplicateScan(true);
+      return;
+    }
+    
+    console.log('[ED] Hashes calculados:', calculatedHashes.length);
+    
+    // Fase 2: Buscar duplicados
+    console.log('[ED] Fase 2: Buscando duplicados...');
+    updateLoadingText('Buscando duplicados...');
+    
+    const foundGroups = await window.electronAPI.findDuplicates(
+      calculatedHashes,
+      (progress) => {
+        if (duplicateScanCancelled) return;
+        const message = `Buscando duplicados: ${progress.percentage}%`;
+        updateLoadingText(message);
+      }
+    );
+    
+    if (duplicateScanCancelled) {
+      console.log('[ED] Escaneo cancelado durante búsqueda de duplicados');
+      await finishDuplicateScan(true);
+      return;
+    }
+    
+    // Guardar grupos y generar cola de comparaciones
+    duplicateGroups = foundGroups;
+    console.log('[ED] Grupos de duplicados encontrados:', duplicateGroups.length);
+    
+    duplicateComparisons = generateComparisonQueue(duplicateGroups);
+    
+    hideLoading();
+    
+    if (duplicateComparisons.length === 0) {
+      alert('No se encontraron imágenes duplicadas.');
+      await finishDuplicateScan(false);
+      return;
+    }
+    
+    console.log('[ED] Total de comparaciones a realizar:', duplicateComparisons.length);
+    currentDuplicateIndex = 0;
+    
+    // Mostrar primera comparación
+    await showNextDuplicate();
+    
+  } catch (error) {
+    console.error('[ED] Error durante escaneo de duplicados:', error);
+    hideLoading();
+    alert('Error durante el escaneo de duplicados: ' + error);
+    await finishDuplicateScan(true);
+  }
+}
+
+/**
+ * Genera la cola de comparaciones desde los grupos de duplicados
+ */
+function generateComparisonQueue(duplicateGroups: Array<{hash: string, images: string[], distance: number}>): Array<{leftImage: string, rightImage: string, groupIndex: number}> {
+  const queue: Array<{leftImage: string, rightImage: string, groupIndex: number}> = [];
+  
+  duplicateGroups.forEach((group, groupIndex) => {
+    if (group.images.length < 2) return;
+    
+    // Para un grupo de N imágenes, necesitamos N-1 comparaciones
+    // Todas las comparaciones se agregan desde el inicio para el contador correcto
+    // Ejemplo: A, B, C = 2 comparaciones (A vs B, luego ganador vs C)
+    for (let i = 1; i < group.images.length; i++) {
+      queue.push({
+        leftImage: group.images[0], // Siempre usar la primera como referencia inicial
+        rightImage: group.images[i],
+        groupIndex: groupIndex
+      });
+    }
+  });
+  
+  return queue;
+}
+
+/**
+ * Marca una imagen como eliminada en su grupo
+ */
+function markImageAsDeleted(imagePath: string, groupIndex: number) {
+  const group = duplicateGroups[groupIndex];
+  if (!group) return;
+  
+  const index = group.images.indexOf(imagePath);
+  if (index !== -1) {
+    group.images[index] = ''; // Marcar como eliminada
+    console.log('[ED] Imagen marcada como eliminada:', imagePath);
+  }
+}
+
+/**
+ * Actualiza todas las comparaciones futuras de un grupo para usar el ganador
+ */
+function updateFutureComparisons(groupIndex: number, winnerImage: string) {
+  // Actualizar todas las comparaciones futuras de este grupo
+  for (let i = currentDuplicateIndex + 1; i < duplicateComparisons.length; i++) {
+    const comp = duplicateComparisons[i];
+    if (comp.groupIndex === groupIndex) {
+      // Si la imagen izquierda está marcada como eliminada, usar el ganador
+      if (comp.leftImage !== winnerImage && isImageDeleted(comp.leftImage, groupIndex)) {
+        comp.leftImage = winnerImage;
+        console.log('[ED] Comparación', i, 'actualizada. Nueva izquierda:', winnerImage);
+      }
+    }
+  }
+}
+
+/**
+ * Verifica si una imagen está marcada como eliminada
+ */
+function isImageDeleted(imagePath: string, groupIndex: number): boolean {
+  const group = duplicateGroups[groupIndex];
+  if (!group) return false;
+  
+  const index = group.images.indexOf(imagePath);
+  return index === -1 || group.images[index] === '';
+}
+
+/**
+ * Salta comparaciones futuras que involucren ambas imágenes conservadas
+ */
+function skipFutureComparisonsWithBoth(groupIndex: number, image1: string, image2: string) {
+  console.log('[ED] Saltando comparaciones futuras entre', image1, 'y', image2);
+  
+  // Marcar las comparaciones futuras de este grupo que involucren estas dos imágenes
+  // como "saltar" cambiando las imágenes a vacías
+  for (let i = currentDuplicateIndex + 1; i < duplicateComparisons.length; i++) {
+    const comp = duplicateComparisons[i];
+    if (comp.groupIndex === groupIndex) {
+      // Si esta comparación involucra alguna de las dos imágenes conservadas
+      const involvesImage1 = comp.leftImage === image1 || comp.rightImage === image1;
+      const involvesImage2 = comp.leftImage === image2 || comp.rightImage === image2;
+      
+      if (involvesImage1 && involvesImage2) {
+        // Esta comparación es entre las dos imágenes conservadas, saltarla
+        comp.leftImage = '';
+        comp.rightImage = '';
+        console.log('[ED] Comparación', i, 'marcada para saltar');
+      }
+    }
+  }
+}
+
+/**
+ * Muestra la siguiente comparación de duplicados
+ */
+async function showNextDuplicate() {
+  // Saltar comparaciones marcadas como vacías (ya evaluadas)
+  while (currentDuplicateIndex < duplicateComparisons.length) {
+    const comp = duplicateComparisons[currentDuplicateIndex];
+    if (comp.leftImage === '' || comp.rightImage === '') {
+      console.log('[ED] Saltando comparación', currentDuplicateIndex, '(ya evaluada)');
+      currentDuplicateIndex++;
+    } else {
+      break;
+    }
+  }
+  
+  if (currentDuplicateIndex >= duplicateComparisons.length) {
+    // Terminamos todas las comparaciones
+    console.log('[ED] Todas las comparaciones completadas');
+    await finishDuplicateScan(false);
+    return;
+  }
+  
+  const comparison = duplicateComparisons[currentDuplicateIndex];
+  console.log('[ED] Mostrando comparación', currentDuplicateIndex + 1, 'de', duplicateComparisons.length);
+  
+  // Actualizar contador
+  if (duplicateCounter) {
+    duplicateCounter.textContent = `Conflicto ${currentDuplicateIndex + 1} de ${duplicateComparisons.length}`;
+  }
+  
+  // Cargar imágenes
+  if (duplicateScanLeftImg) {
+    const leftPath = comparison.leftImage.replace(/\\/g, '/');
+    duplicateScanLeftImg.src = `file:///${leftPath}`;
+    console.log('[ED] Cargando imagen izquierda:', duplicateScanLeftImg.src);
+  }
+  if (duplicateScanRightImg) {
+    const rightPath = comparison.rightImage.replace(/\\/g, '/');
+    duplicateScanRightImg.src = `file:///${rightPath}`;
+    console.log('[ED] Cargando imagen derecha:', duplicateScanRightImg.src);
+  }
+  
+  // Mostrar rutas completas
+  if (duplicateScanLeftPath) {
+    duplicateScanLeftPath.textContent = comparison.leftImage;
+  }
+  if (duplicateScanRightPath) {
+    duplicateScanRightPath.textContent = comparison.rightImage;
+  }
+  
+  // Cargar metadatos
+  try {
+    const [leftMeta, rightMeta] = await Promise.all([
+      window.electronAPI.getSingleImageMetadata(comparison.leftImage),
+      window.electronAPI.getSingleImageMetadata(comparison.rightImage)
+    ]);
+    
+    console.log('[ED] Metadatos cargados:', { leftMeta, rightMeta });
+    
+    if (leftMeta && rightMeta) {
+      // Izquierda - Tamaño
+      const leftSizeEl = document.getElementById('duplicate-left-size');
+      const rightSizeEl = document.getElementById('duplicate-right-size');
+      
+      if (leftSizeEl && rightSizeEl) {
+        const sizeDiff = Math.abs(leftMeta.size - rightMeta.size);
+        leftSizeEl.innerHTML = formatFileSize(leftMeta.size);
+        rightSizeEl.innerHTML = formatFileSize(rightMeta.size);
+        
+        if (sizeDiff > 1024) {
+          if (leftMeta.size < rightMeta.size) {
+            leftSizeEl.innerHTML += ' <span class="detail-comparison better">(Más ligero)</span>';
+            rightSizeEl.innerHTML += ' <span class="detail-comparison worse">(Más pesado)</span>';
+          } else {
+            leftSizeEl.innerHTML += ' <span class="detail-comparison worse">(Más pesado)</span>';
+            rightSizeEl.innerHTML += ' <span class="detail-comparison better">(Más ligero)</span>';
+          }
+        }
+      }
+      
+      // Fecha
+      const leftDateEl = document.getElementById('duplicate-left-date');
+      const rightDateEl = document.getElementById('duplicate-right-date');
+      
+      if (leftDateEl && rightDateEl) {
+        const leftTime = leftMeta.modified || leftMeta.modifiedTime;
+        const rightTime = rightMeta.modified || rightMeta.modifiedTime;
+        
+        leftDateEl.innerHTML = new Date(leftTime).toLocaleString('es-ES');
+        rightDateEl.innerHTML = new Date(rightTime).toLocaleString('es-ES');
+        
+        if (leftTime !== rightTime) {
+          if (leftTime > rightTime) {
+            leftDateEl.innerHTML += ' <span class="detail-comparison better">(Más reciente)</span>';
+            rightDateEl.innerHTML += ' <span class="detail-comparison worse">(Más antiguo)</span>';
+          } else {
+            leftDateEl.innerHTML += ' <span class="detail-comparison worse">(Más antiguo)</span>';
+            rightDateEl.innerHTML += ' <span class="detail-comparison better">(Más reciente)</span>';
+          }
+        }
+      }
+      
+      // Dimensiones
+      const leftDimEl = document.getElementById('duplicate-left-dimensions');
+      const rightDimEl = document.getElementById('duplicate-right-dimensions');
+      
+      if (leftDimEl && rightDimEl) {
+        const leftPixels = (leftMeta.width || 0) * (leftMeta.height || 0);
+        const rightPixels = (rightMeta.width || 0) * (rightMeta.height || 0);
+        
+        leftDimEl.innerHTML = `${leftMeta.width || 0} × ${leftMeta.height || 0}`;
+        rightDimEl.innerHTML = `${rightMeta.width || 0} × ${rightMeta.height || 0}`;
+        
+        const pixelDiff = Math.abs(leftPixels - rightPixels);
+        if (pixelDiff > 10000) {
+          if (leftPixels > rightPixels) {
+            leftDimEl.innerHTML += ' <span class="detail-comparison better">(Más grande)</span>';
+            rightDimEl.innerHTML += ' <span class="detail-comparison worse">(Más pequeño)</span>';
+          } else {
+            leftDimEl.innerHTML += ' <span class="detail-comparison worse">(Más pequeño)</span>';
+            rightDimEl.innerHTML += ' <span class="detail-comparison better">(Más grande)</span>';
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[ED] Error cargando metadatos:', error);
+  }
+  
+  // Mostrar modal
+  if (duplicateScanModal) {
+    duplicateScanModal.style.display = 'flex';
+  }
+}
+
+/**
+ * Maneja el click en la imagen izquierda (eliminar derecha)
+ */
+async function handleLeftImageClick() {
+  const comparison = duplicateComparisons[currentDuplicateIndex];
+  console.log('[ED] Eliminar imagen derecha:', comparison.rightImage);
+  
+  try {
+    await window.electronAPI.moveToTrash(comparison.rightImage);
+    console.log('[ED] Imagen derecha eliminada');
+    
+    // Marcar como eliminada en el grupo
+    markImageAsDeleted(comparison.rightImage, comparison.groupIndex);
+    
+    // La imagen izquierda es el ganador
+    // Actualizar todas las comparaciones futuras de este grupo
+    updateFutureComparisons(comparison.groupIndex, comparison.leftImage);
+    
+    // Pasar a la siguiente comparación
+    currentDuplicateIndex++;
+    await showNextDuplicate();
+    
+  } catch (error) {
+    console.error('[ED] Error eliminando imagen derecha:', error);
+    alert('Error al eliminar la imagen: ' + error);
+  }
+}
+
+/**
+ * Maneja el click en la imagen derecha (eliminar izquierda)
+ */
+async function handleRightImageClick() {
+  const comparison = duplicateComparisons[currentDuplicateIndex];
+  console.log('[ED] Eliminar imagen izquierda:', comparison.leftImage);
+  
+  try {
+    await window.electronAPI.moveToTrash(comparison.leftImage);
+    console.log('[ED] Imagen izquierda eliminada');
+    
+    // Marcar como eliminada en el grupo
+    markImageAsDeleted(comparison.leftImage, comparison.groupIndex);
+    
+    // La imagen derecha es el ganador
+    // Actualizar todas las comparaciones futuras de este grupo
+    updateFutureComparisons(comparison.groupIndex, comparison.rightImage);
+    
+    // Pasar a la siguiente comparación
+    currentDuplicateIndex++;
+    await showNextDuplicate();
+    
+  } catch (error) {
+    console.error('[ED] Error eliminando imagen izquierda:', error);
+    alert('Error al eliminar la imagen: ' + error);
+  }
+}
+
+/**
+ * Maneja el botón "Conservar ambas"
+ */
+async function handleKeepBoth() {
+  const comparison = duplicateComparisons[currentDuplicateIndex];
+  console.log('[ED] Conservar ambas imágenes');
+  
+  // Mantener ambas: marcar ambas como evaluadas para este grupo
+  // Saltar todas las comparaciones futuras que involucren estas dos imágenes
+  skipFutureComparisonsWithBoth(comparison.groupIndex, comparison.leftImage, comparison.rightImage);
+  
+  // Pasar a la siguiente comparación sin eliminar nada
+  currentDuplicateIndex++;
+  await showNextDuplicate();
+}
+
+/**
+ * Maneja el botón "Cancelar escaneo"
+ */
+async function handleCancelScan() {
+  console.log('[ED] Botón Cancelar presionado');
+  
+  // Ir directamente al modal de caché sin confirmación
+  console.log('[ED] Mostrando modal de caché...');
+  duplicateScanCancelled = true;
+  
+  // Ocultar modal de comparación
+  if (duplicateScanModal) {
+    duplicateScanModal.style.display = 'none';
+  }
+  
+  // Mostrar modal de caché
+  await finishDuplicateScan(false);
+}
+
+/**
+ * Finaliza el escaneo de duplicados y pregunta por caché
+ */
+async function finishDuplicateScan(cancelled: boolean) {
+  console.log('[ED] Finalizando escaneo. Cancelado:', cancelled);
+  
+  // Ocultar modal de comparación si está visible
+  if (duplicateScanModal) {
+    duplicateScanModal.style.display = 'none';
+  }
+  
+  // Preguntar por caché solo si se calcularon hashes y NO fue cancelado
+  if (!cancelled && calculatedHashes.length > 0 && currentDirectory) {
+    try {
+      // Calcular tamaño ANTES de mostrar el modal
+      console.log('[ED] Calculando tamaño de caché...');
+      const cacheSizeBytes = JSON.stringify(calculatedHashes).length;
+      const cacheSizeKB = Math.round(cacheSizeBytes / 1024);
+      
+      console.log('[ED] Tamaño de caché calculado:', cacheSizeKB, 'KB');
+      
+      if (cacheConfirmText) {
+        cacheConfirmText.textContent = `¿Deseas guardar la caché de hashes (${cacheSizeKB} KB) para acelerar futuros escaneos?`;
+      }
+      
+      if (cacheConfirmModal) {
+        cacheConfirmModal.style.display = 'flex';
+      }
+    } catch (error) {
+      console.error('[ED] Error calculando tamaño de caché:', error);
+      await exitDuplicateScanMode();
+    }
+  } else {
+    await exitDuplicateScanMode();
+  }
+}
+
+/**
+ * Guarda la caché de hashes
+ */
+async function saveCacheAndExit() {
+  console.log('[ED] Guardando caché de hashes...');
+  
+  if (cacheConfirmModal) {
+    cacheConfirmModal.style.display = 'none';
+  }
+  
+  if (currentDirectory && calculatedHashes.length > 0) {
+    try {
+      await window.electronAPI.saveHashCache(currentDirectory, calculatedHashes);
+      console.log('[ED] Caché guardada exitosamente');
+    } catch (error) {
+      console.error('[ED] Error guardando caché:', error);
+    }
+  }
+  
+  await exitDuplicateScanMode();
+}
+
+/**
+ * No guarda la caché y sale del modo
+ */
+async function dontSaveCacheAndExit() {
+  console.log('[ED] No guardando caché');
+  
+  if (cacheConfirmModal) {
+    cacheConfirmModal.style.display = 'none';
+  }
+  
+  await exitDuplicateScanMode();
+}
+
+/**
+ * Sale del modo de escaneo de duplicados
+ */
+async function exitDuplicateScanMode() {
+  console.log('[ED] Saliendo del modo de escaneo de duplicados');
+  
+  // Desactivar modo
+  isDuplicateScanMode = false;
+  duplicateComparisons = [];
+  currentDuplicateIndex = 0;
+  calculatedHashes = [];
+  duplicateScanCancelled = false;
+  
+  // UI: Desactivar botón
+  if (duplicateScanBtn) duplicateScanBtn.classList.remove('active');
+  
+  // Mostrar imagen y carrusel PRIMERO
+  if (viewer) viewer.style.display = 'flex';
+  const carouselContainer = document.getElementById('carousel-container') as HTMLElement;
+  if (carouselContainer) carouselContainer.style.display = 'flex';
+  
+  // Rehabilitar controles
+  enableControlsAfterDuplicateScan();
+  
+  // Recargar directorio para reflejar cambios
+  if (currentDirectory) {
+    console.log('[ED] Recargando directorio...');
+    await loadDirectory(currentDirectory);
+  }
+}
+
+/**
+ * Deshabilita controles durante el escaneo de duplicados
+ */
+function disableControlsDuringDuplicateScan() {
+  console.log('[ED] Deshabilitando controles');
+  
+  // Deshabilitar botones de zoom
+  if (zoomInBtn) zoomInBtn.disabled = true;
+  if (zoomOutBtn) zoomOutBtn.disabled = true;
+  if (zoomResetBtn) zoomResetBtn.disabled = true;
+  if (fitToWindowBtn) fitToWindowBtn.disabled = true;
+  
+  // Deshabilitar REPO
+  if (toggleDragModeBtn) toggleDragModeBtn.disabled = true;
+  
+  // Deshabilitar selección múltiple
+  if (multiSelectBtn) multiSelectBtn.disabled = true;
+  
+  // Deshabilitar organizar por año
+  if (organizeByYearBtn) organizeByYearBtn.disabled = true;
+  
+  // Deshabilitar filtro
+  if (filterBtn) filterBtn.disabled = true;
+  
+  // Deshabilitar selector de directorio
+  const selectDirBtn = document.getElementById('select-dir-btn') as HTMLButtonElement;
+  if (selectDirBtn) selectDirBtn.disabled = true;
+}
+
+/**
+ * Rehabilita controles después del escaneo de duplicados
+ */
+function enableControlsAfterDuplicateScan() {
+  console.log('[ED] Rehabilitando controles');
+  
+  // Rehabilitar botones de zoom
+  if (zoomInBtn) zoomInBtn.disabled = false;
+  if (zoomOutBtn) zoomOutBtn.disabled = false;
+  if (zoomResetBtn) zoomResetBtn.disabled = false;
+  if (fitToWindowBtn) fitToWindowBtn.disabled = false;
+  
+  // Rehabilitar REPO
+  if (toggleDragModeBtn) toggleDragModeBtn.disabled = false;
+  
+  // Rehabilitar selección múltiple
+  if (multiSelectBtn) multiSelectBtn.disabled = false;
+  
+  // Rehabilitar organizar por año
+  if (organizeByYearBtn) organizeByYearBtn.disabled = false;
+  
+  // Rehabilitar filtro
+  if (filterBtn) filterBtn.disabled = false;
+  
+  // Rehabilitar selector de directorio
+  const selectDirBtn = document.getElementById('select-dir-btn') as HTMLButtonElement;
+  if (selectDirBtn) selectDirBtn.disabled = false;
+}
+
+/**
+ * Actualiza el texto del loading overlay
+ */
+function updateLoadingText(text: string) {
+  const loadingText = document.getElementById('loading-text') as HTMLElement;
+  if (loadingText) {
+    loadingText.textContent = text;
+  }
+}
+
+// Event listeners para el modal de escaneo de duplicados
+if (duplicateScanLeftSection) {
+  duplicateScanLeftSection.addEventListener('click', () => {
+    handleLeftImageClick();
+  });
+}
+
+if (duplicateScanRightSection) {
+  duplicateScanRightSection.addEventListener('click', () => {
+    handleRightImageClick();
+  });
+}
+
+if (duplicateKeepBothBtn) {
+  duplicateKeepBothBtn.addEventListener('click', () => {
+    handleKeepBoth();
+  });
+}
+
+if (duplicateCancelScanBtn) {
+  duplicateCancelScanBtn.addEventListener('click', () => {
+    console.log('[ED] Click en botón Cancelar escaneo');
+    handleCancelScan();
+  });
+}
+
+// Event listeners para el modal de confirmación de caché
+if (cacheSaveBtn) {
+  cacheSaveBtn.addEventListener('click', () => {
+    console.log('[ED] Click en botón Guardar caché');
+    saveCacheAndExit();
+  });
+} else {
+  console.error('[ED] No se encontró cacheSaveBtn');
+}
+
+if (cacheDontSaveBtn) {
+  cacheDontSaveBtn.addEventListener('click', () => {
+    console.log('[ED] Click en botón No guardar caché');
+    dontSaveCacheAndExit();
+  });
+} else {
+  console.error('[ED] No se encontró cacheDontSaveBtn');
 }

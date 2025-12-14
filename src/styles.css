@@ -1537,3 +1537,31 @@ body {
 .btn-secondary:hover {
   background-color: #666;
 }
+
+/* Botón de escaneo de duplicados activo */
+#duplicate-scan-btn.active {
+  background-color: #9b59b6;
+  color: white;
+}
+
+#duplicate-scan-btn.active:hover {
+  background-color: #8e44ad;
+}
+
+/* Contador de duplicados en modal */
+.duplicate-counter {
+  font-size: 13px;
+  color: #ff4444;
+  margin-top: 5px;
+  font-weight: bold;
+}
+
+/* Rutas completas en modal de duplicados */
+.section-title-path {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 10px;
+  word-break: break-all;
+  line-height: 1.4;
+  min-height: 32px;
+}

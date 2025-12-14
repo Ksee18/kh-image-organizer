@@ -33,6 +33,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-single-image-metadata', imagePath),
   deleteFile: (filePath: string) =>
     ipcRenderer.invoke('delete-file', filePath),
+  calculateHashes: (directoryPath: string, onProgress: (progress: any) => void) => {
+    // Registrar listener para progreso
+    ipcRenderer.on('hash-progress', (_event, progress) => onProgress(progress));
+    // Iniciar cálculo
+    return ipcRenderer.invoke('calculate-hashes', directoryPath);
+  },
+  findDuplicates: (hashes: any[], onProgress: (progress: any) => void) => {
+    // El listener ya está registrado desde calculateHashes
+    return ipcRenderer.invoke('find-duplicates', hashes);
+  },
+  getHashCacheSize: (directoryPath: string) =>
+    ipcRenderer.invoke('get-hash-cache-size', directoryPath),
+  saveHashCache: (directoryPath: string, hashes: any[]) =>
+    ipcRenderer.invoke('save-hash-cache', directoryPath, hashes),
+  clearHashCache: (directoryPath: string) =>
+    ipcRenderer.invoke('clear-hash-cache', directoryPath),
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),
