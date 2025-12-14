@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('run-cache-eviction'),
   createFolder: (parentPath: string, folderName: string) => 
     ipcRenderer.invoke('create-folder', parentPath, folderName),
+  renameFolder: (oldPath: string, newName: string) => 
+    ipcRenderer.invoke('rename-folder', oldPath, newName),
   moveToTrash: (filePath: string) => 
     ipcRenderer.invoke('move-to-trash', filePath),
   moveFile: (filePath: string, targetDirectory: string, newFileName?: string) => 
@@ -47,6 +49,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-hash-cache-size', directoryPath),
   saveHashCache: (directoryPath: string, hashes: any[]) =>
     ipcRenderer.invoke('save-hash-cache', directoryPath, hashes),
+  showItemInFolder: (filePath: string) =>
+    ipcRenderer.invoke('show-item-in-folder', filePath),
+  openPath: (dirPath: string) =>
+    ipcRenderer.invoke('open-path', dirPath),
+  copyImageToClipboard: (filePath: string) =>
+    ipcRenderer.invoke('copy-image-to-clipboard', filePath),
   clearHashCache: (directoryPath: string) =>
     ipcRenderer.invoke('clear-hash-cache', directoryPath),
   windowMinimize: () => ipcRenderer.send('window-minimize'),

@@ -4,6 +4,44 @@ Registro de cambios y evolución del proyecto **KH Image Organizer**.
 
 ---
 
+## [1.2.1] - 2025-12-14
+
+### ✨ Nuevas Características
+
+#### 📁 Menús Contextuales para Directorios
+- **Navegación con clic derecho**: Eliminado doble clic para evitar conflictos con centrado de directorios
+- **Menú contextual de directorios**:
+  - Abrir carpeta: Navega al directorio seleccionado
+  - Abrir en Explorer: Abre el directorio en el Explorador de Windows (`shell.openPath()`)
+  - Renombrar carpeta: Modal con validación de caracteres inválidos
+  - Quitar carpeta: Solo visible para directorios destino
+- **Modal de renombrar**: Estructura consistente con modal de nueva carpeta, incluyendo header estilizado
+
+#### 🖼️ Menú Contextual de Imágenes
+- **Clic derecho en imágenes**:
+  - Copiar imagen al portapapeles: Con corrección automática de orientación EXIF
+  - Mostrar en explorador: Resalta el archivo en el Explorador de Windows
+
+### 🐛 Correcciones
+- **EXIF Orientation**: Corrección de orientación automática para fotos portrait/rotadas
+  - Implementación con `Sharp.rotate()` que detecta y aplica rotación EXIF automáticamente
+  - Afecta a: thumbnails, viewer principal, copiar al portapapeles
+  - Overhead mínimo: 1-2ms por imagen
+  - Solucionado problema donde fotos verticales aparecían horizontales
+- **Navegación de teclado en modales**:
+  - Deshabilitado CTRL para modo SM cuando hay modales abiertos
+  - Deshabilitadas flechas izquierda/derecha en carrusel cuando hay modales abiertos
+  - Permite usar CTRL+flechas para moverse entre palabras en inputs
+  - Permite usar flechas para navegar en el texto de los inputs
+
+### 🔧 Mejoras Técnicas
+- Agregado IPC handler `open-path` para abrir directorios directamente
+- Agregado IPC handler `rename-folder` con validación de rutas existentes
+- Mejorada experiencia UX al separar acciones de navegación de menús contextuales
+- Validación de caracteres inválidos en nombres de carpetas: `<>:"/\|?*`
+
+---
+
 ## [1.2.0] - 2025-12-13
 
 ### 🎉 Actualización Mayor - Escaneo de Imágenes Duplicadas

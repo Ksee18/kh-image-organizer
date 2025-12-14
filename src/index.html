@@ -434,6 +434,48 @@
       </div>
     </div>
   </div>
+
+  <!-- Menú contextual para imagen -->
+  <div class="context-menu" id="image-context-menu" style="display: none;">
+    <div class="context-menu-item" id="context-copy-image">
+      <span>Copiar</span>
+    </div>
+    <div class="context-menu-item" id="context-show-in-explorer">
+      <span>Ubicar en Explorer</span>
+    </div>
+  </div>
+
+  <!-- Menú contextual para directorios -->
+  <div class="context-menu" id="directory-context-menu" style="display: none;">
+    <div class="context-menu-item" id="context-open-folder">
+      <span>Abrir carpeta</span>
+    </div>
+    <div class="context-menu-item" id="context-open-in-explorer">
+      <span>Abrir en Explorer</span>
+    </div>
+    <div class="context-menu-item" id="context-rename-folder">
+      <span>Renombrar carpeta</span>
+    </div>
+    <div class="context-menu-item" id="context-remove-destination" style="display: none;">
+      <span>Quitar carpeta</span>
+    </div>
+  </div>
+
+  <!-- Modal renombrar carpeta -->
+  <div class="modal-overlay" id="rename-folder-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Renombrar carpeta</h3>
+      </div>
+      <div class="modal-body">
+        <label for="rename-folder-input">Nuevo nombre de la carpeta:</label>
+        <div class="input-group">
+          <input type="text" id="rename-folder-input" class="folder-input" placeholder="Nuevo nombre..." maxlength="255">
+          <button class="btn-primary" id="save-rename-btn">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
   
   <script src="../dist/renderer.js"></script>
 </body>

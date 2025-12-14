@@ -102,15 +102,10 @@ release/KH Image Organizer-win32-x64/KH Image Organizer.exe
 - **Native Modules**: Optimized for Windows x64
 
 ### 🚧 Upcoming Features
-- **Multi-Select Mode (SM)**: Select and move multiple images simultaneously
-  - Batch movement of selected images
-  - Visual selection UI with thumbnails
-  - Conflict handling for multiple operations
-  - Drag & drop for visual selection
-  - Selection counter
+- **Back Button**: Button to undo the last file move action
 - **English Language Support**: Interface translation
 - **Light Theme**: Alternative color scheme
-- **Bulk Organization**: Organize current directory by creation year
+
 
 ### 📝 License
 This project is provided as-is for personal and educational use.
@@ -219,15 +214,9 @@ release/KH Image Organizer-win32-x64/KH Image Organizer.exe
 - **Módulos Nativos**: Optimizado para Windows x64
 
 ### 🚧 Características Próximas
-- **Modo Multi-Selección (SM)**: Selecciona y mueve múltiples imágenes simultáneamente
-  - Movimiento en batch de imágenes seleccionadas
-  - UI visual de selección con miniaturas
-  - Manejo de conflictos para operaciones múltiples
-  - Drag & drop para selección visual
-  - Contador de selección
 - **Idioma Inglés**: Traducción de la interfaz
 - **Tema Claro**: Esquema de color alternativo
-- **Organización Masiva**: Organizar directorio actual separado por año de creación
+- **Boton atras**: Boton para deshacer la ultima accion de archivos movidos
 
 ### 📝 Licencia
 Este proyecto se proporciona tal cual para uso personal y educativo.

@@ -133,6 +133,28 @@ const cacheConfirmText = document.getElementById('cache-size-info') as HTMLEleme
 const cacheSaveBtn = document.getElementById('cache-save-btn') as HTMLButtonElement;
 const cacheDontSaveBtn = document.getElementById('cache-dont-save-btn') as HTMLButtonElement;
 
+// Menú contextual
+const imageContextMenu = document.getElementById('image-context-menu') as HTMLElement;
+const contextCopyImage = document.getElementById('context-copy-image') as HTMLElement;
+const contextShowInExplorer = document.getElementById('context-show-in-explorer') as HTMLElement;
+
+// Menú contextual de directorios
+const directoryContextMenu = document.getElementById('directory-context-menu') as HTMLElement;
+const contextOpenFolder = document.getElementById('context-open-folder') as HTMLElement;
+const contextOpenInExplorer = document.getElementById('context-open-in-explorer') as HTMLElement;
+const contextRenameFolder = document.getElementById('context-rename-folder') as HTMLElement;
+const contextRemoveDestination = document.getElementById('context-remove-destination') as HTMLElement;
+
+// Modal renombrar carpeta
+const renameFolderModal = document.getElementById('rename-folder-modal') as HTMLElement;
+const renameFolderInput = document.getElementById('rename-folder-input') as HTMLInputElement;
+const cancelRenameBtn = document.getElementById('cancel-rename-btn') as HTMLButtonElement;
+const saveRenameBtn = document.getElementById('save-rename-btn') as HTMLButtonElement;
+
+// Variables para el menú contextual de directorios
+let currentContextDirectory: string | null = null;
+let currentContextIsDestination: boolean = false;
+
 const THUMBNAIL_SIZE = 84;
 
 // Event listeners para controles de ventana
@@ -151,6 +173,266 @@ if (windowMaximizeBtn) {
 if (windowCloseBtn) {
   windowCloseBtn.addEventListener('click', () => {
     window.electronAPI.windowClose();
+  });
+}
+
+// Event listeners para menú contextual
+if (currentImage) {
+  // Mostrar menú contextual en clic derecho
+  currentImage.addEventListener('contextmenu', (e: MouseEvent) => {
+    e.preventDefault();
+    
+    // No mostrar menú si estamos en modo multi-selección o escaneo de duplicados
+    if (isMultiSelectMode || isDuplicateScanMode) {
+      return;
+    }
+    
+    // Posicionar el menú en la ubicación del cursor
+    if (imageContextMenu) {
+      imageContextMenu.style.display = 'block';
+      imageContextMenu.style.left = `${e.clientX}px`;
+      imageContextMenu.style.top = `${e.clientY}px`;
+    }
+  });
+}
+
+// Ocultar menú contextual al hacer clic fuera
+document.addEventListener('click', () => {
+  if (imageContextMenu) {
+    imageContextMenu.style.display = 'none';
+  }
+});
+
+// Copiar imagen al portapapeles
+if (contextCopyImage) {
+  contextCopyImage.addEventListener('click', async () => {
+    if (currentImages.length === 0) return;
+    
+    const currentImagePath = currentImages[currentImageIndex];
+    try {
+      await window.electronAPI.copyImageToClipboard(currentImagePath);
+      console.log('[Context Menu] Imagen copiada al portapapeles');
+    } catch (error) {
+      console.error('[Context Menu] Error copiando imagen:', error);
+    }
+    
+    // Ocultar menú
+    if (imageContextMenu) {
+      imageContextMenu.style.display = 'none';
+    }
+  });
+}
+
+// Mostrar imagen en explorador
+if (contextShowInExplorer) {
+  contextShowInExplorer.addEventListener('click', async () => {
+    if (currentImages.length === 0) return;
+    
+    const currentImagePath = currentImages[currentImageIndex];
+    try {
+      await window.electronAPI.showItemInFolder(currentImagePath);
+      console.log('[Context Menu] Mostrando imagen en explorador');
+    } catch (error) {
+      console.error('[Context Menu] Error mostrando imagen en explorador:', error);
+    }
+    
+    // Ocultar menú
+    if (imageContextMenu) {
+      imageContextMenu.style.display = 'none';
+    }
+  });
+}
+
+// Funciones para el menú contextual de directorios
+function showDirectoryContextMenu(e: MouseEvent, dirPath: string, isDestination: boolean) {
+  if (!directoryContextMenu) return;
+  
+  currentContextDirectory = dirPath;
+  currentContextIsDestination = isDestination;
+  
+  // Mostrar/ocultar opción "Quitar carpeta" según si es directorio destino
+  if (contextRemoveDestination) {
+    contextRemoveDestination.style.display = isDestination ? 'block' : 'none';
+  }
+  
+  // Posicionar y mostrar menú
+  directoryContextMenu.style.display = 'block';
+  directoryContextMenu.style.left = `${e.clientX}px`;
+  directoryContextMenu.style.top = `${e.clientY}px`;
+}
+
+// Ocultar menú contextual de directorios al hacer clic fuera
+document.addEventListener('click', () => {
+  if (directoryContextMenu) {
+    directoryContextMenu.style.display = 'none';
+  }
+});
+
+// Abrir carpeta
+if (contextOpenFolder) {
+  contextOpenFolder.addEventListener('click', () => {
+    if (currentContextDirectory) {
+      console.log('[Context Menu] Abrir carpeta:', currentContextDirectory);
+      
+      // Si es directorio destino, quitarlo de la lista antes de navegar
+      if (currentContextIsDestination) {
+        const index = destinationDirectories.indexOf(currentContextDirectory);
+        if (index > -1) {
+          destinationDirectories.splice(index, 1);
+          displayDestinationDirectories();
+        }
+      }
+      
+      loadDirectory(currentContextDirectory);
+    }
+    if (directoryContextMenu) {
+      directoryContextMenu.style.display = 'none';
+    }
+  });
+}
+
+// Abrir en Explorer
+if (contextOpenInExplorer) {
+  contextOpenInExplorer.addEventListener('click', async () => {
+    if (currentContextDirectory) {
+      try {
+        await window.electronAPI.openPath(currentContextDirectory);
+        console.log('[Context Menu] Abriendo en Explorer:', currentContextDirectory);
+      } catch (error) {
+        console.error('[Context Menu] Error abriendo en Explorer:', error);
+      }
+    }
+    if (directoryContextMenu) {
+      directoryContextMenu.style.display = 'none';
+    }
+  });
+}
+
+// Renombrar carpeta
+if (contextRenameFolder) {
+  contextRenameFolder.addEventListener('click', () => {
+    if (currentContextDirectory) {
+      openRenameFolderModal(currentContextDirectory);
+    }
+    if (directoryContextMenu) {
+      directoryContextMenu.style.display = 'none';
+    }
+  });
+}
+
+// Quitar carpeta de destinos
+if (contextRemoveDestination) {
+  contextRemoveDestination.addEventListener('click', () => {
+    if (currentContextDirectory && currentContextIsDestination) {
+      const index = destinationDirectories.indexOf(currentContextDirectory);
+      if (index > -1) {
+        destinationDirectories.splice(index, 1);
+        displayDestinationDirectories();
+        console.log('[Context Menu] Carpeta quitada de destinos:', currentContextDirectory);
+      }
+    }
+    if (directoryContextMenu) {
+      directoryContextMenu.style.display = 'none';
+    }
+  });
+}
+
+// Modal de renombrar carpeta
+function openRenameFolderModal(dirPath: string) {
+  if (!renameFolderModal || !renameFolderInput) return;
+  
+  quickNavigationEnabled = false;
+  const folderName = dirPath.split('\\').pop() || dirPath.split('/').pop() || '';
+  renameFolderInput.value = folderName;
+  renameFolderModal.style.display = 'flex';
+  setTimeout(() => {
+    renameFolderInput.focus();
+    renameFolderInput.select();
+  }, 100);
+}
+
+function closeRenameFolderModal() {
+  if (!renameFolderModal || !renameFolderInput) return;
+  
+  quickNavigationEnabled = true;
+  renameFolderModal.style.display = 'none';
+  renameFolderInput.value = '';
+  currentContextDirectory = null;
+}
+
+async function saveRenameFolder() {
+  if (!currentContextDirectory || !renameFolderInput) return;
+  
+  const newName = renameFolderInput.value.trim();
+  if (!newName) {
+    alert('Debes ingresar un nombre para la carpeta');
+    return;
+  }
+  
+  const oldPath = currentContextDirectory;
+  const parentPath = oldPath.substring(0, oldPath.lastIndexOf('\\')) || 
+                     oldPath.substring(0, oldPath.lastIndexOf('/'));
+  
+  try {
+    const success = await window.electronAPI.renameFolder(oldPath, newName);
+    if (success) {
+      console.log('[Rename] Carpeta renombrada:', oldPath, '->', newName);
+      
+      // Actualizar en destinos si existe
+      const destIndex = destinationDirectories.indexOf(oldPath);
+      if (destIndex > -1) {
+        const newPath = `${parentPath}\\${newName}`;
+        destinationDirectories[destIndex] = newPath;
+        displayDestinationDirectories();
+      }
+      
+      // Recargar subdirectorios si estamos en el padre
+      if (currentDirectory === parentPath) {
+        subdirectories = await window.electronAPI.getSubdirectories(currentDirectory);
+        displaySubdirectories(subdirectories);
+      }
+      
+      closeRenameFolderModal();
+    } else {
+      alert('Error al renombrar la carpeta');
+    }
+  } catch (error) {
+    console.error('[Rename] Error:', error);
+    alert('Error al renombrar la carpeta');
+  }
+}
+
+// Event listeners para modal de renombrar
+if (renameFolderInput) {
+  renameFolderInput.addEventListener('input', (e) => {
+    const target = e.target as HTMLInputElement;
+    target.value = target.value.replace(/[<>:"/\\|?*\x00-\x1F]/g, '');
+  });
+  
+  renameFolderInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveRenameFolder();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeRenameFolderModal();
+    }
+  });
+}
+
+if (cancelRenameBtn) {
+  cancelRenameBtn.addEventListener('click', () => closeRenameFolderModal());
+}
+
+if (saveRenameBtn) {
+  saveRenameBtn.addEventListener('click', () => saveRenameFolder());
+}
+
+if (renameFolderModal) {
+  renameFolderModal.addEventListener('click', (e) => {
+    if (e.target === renameFolderModal) {
+      closeRenameFolderModal();
+    }
   });
 }
 
@@ -697,13 +979,10 @@ function displaySubdirectories(directories: any[]) {
         }, 600);
       });
       
-      // Doble clic: navegar
-      htmlItem.addEventListener('dblclick', () => {
-        const path = htmlItem.dataset.path;
-        if (path) {
-          console.log('[Renderer] Doble clic en subdirectorio:', path);
-          loadDirectory(path);
-        }
+      // Clic derecho: menú contextual
+      htmlItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showDirectoryContextMenu(e, htmlItem.dataset.path || '', false);
       });
       
       // Configurar drop zone
@@ -754,24 +1033,10 @@ function displayDestinationDirectories() {
         }, 600);
       });
       
-      // Doble clic: navegar
-      htmlItem.addEventListener('dblclick', () => {
-        const path = htmlItem.dataset.path;
-        const isDestination = htmlItem.dataset.isDestination === 'true';
-        if (path) {
-          console.log('[Renderer] Doble clic en directorio destino:', path);
-          
-          // Si es directorio destino, eliminarlo de la lista antes de navegar
-          if (isDestination) {
-            const index = destinationDirectories.indexOf(path);
-            if (index > -1) {
-              destinationDirectories.splice(index, 1);
-              displayDestinationDirectories();
-            }
-          }
-          
-          loadDirectory(path);
-        }
+      // Clic derecho: menú contextual
+      htmlItem.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showDirectoryContextMenu(e, htmlItem.dataset.path || '', true);
       });
       
       // Configurar drop zone
@@ -1160,6 +1425,8 @@ document.addEventListener('keydown', (e) => {
   
   // CTRL para activar modo SM
   if (e.key === 'Control' && !isMultiSelectMode) {
+    // No activar modo SM si hay modales abiertos (CTRL se usa para moverse entre palabras)
+    if (!quickNavigationEnabled) return;
     e.preventDefault();
     toggleMultiSelectMode();
     return;
@@ -1173,10 +1440,14 @@ document.addEventListener('keydown', (e) => {
   }
   
   if (e.key === 'ArrowLeft') {
+    // No procesar si hay modales abiertos (la única navegación válida debe ser en el input)
+    if (!quickNavigationEnabled) return;
     e.preventDefault();
     // En SM solo mueve carrusel, no cambia selección
     navigatePrevious();
   } else if (e.key === 'ArrowRight') {
+    // No procesar si hay modales abiertos (la única navegación válida debe ser en el input)
+    if (!quickNavigationEnabled) return;
     e.preventDefault();
     // En SM solo mueve carrusel, no cambia selección
     navigateNext();

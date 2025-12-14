@@ -72,9 +72,13 @@ export interface ElectronAPI {
   clearCache: () => Promise<boolean>;
   runCacheEviction: () => Promise<boolean>;
   createFolder: (parentPath: string, folderName: string) => Promise<boolean>;
+  renameFolder: (oldPath: string, newName: string) => Promise<boolean>;
   moveToTrash: (filePath: string) => Promise<boolean>;
   moveFile: (filePath: string, targetDirectory: string, newFileName?: string) => Promise<MoveFileResult>;
   deleteFile: (filePath: string) => Promise<boolean>;
+  showItemInFolder: (filePath: string) => Promise<boolean>;
+  openPath: (dirPath: string) => Promise<boolean>;
+  copyImageToClipboard: (filePath: string) => Promise<boolean>;
   calculateHashes: (directoryPath: string, onProgress: (progress: HashProgress) => void) => Promise<ImageHash[]>;
   findDuplicates: (hashes: ImageHash[], onProgress: (progress: HashProgress) => void) => Promise<DuplicateGroup[]>;
   getHashCacheSize: (directoryPath: string) => Promise<number>;

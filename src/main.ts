@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, dialog, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { promises as fsPromises } from 'fs';
+import sharp from 'sharp';
 import { logger } from './logger';
 import { processThumbnailRequest, processThumbnailBatch, ThumbnailRequest } from './thumbnail-generator';
 import { getCacheSize } from './cache-utils';
@@ -366,6 +367,28 @@ ipcMain.handle('create-folder', async (event, parentPath: string, folderName: st
   }
 });
 
+// Renombrar carpeta
+ipcMain.handle('rename-folder', async (event, oldPath: string, newName: string) => {
+  logger.info('IPC: rename-folder', { oldPath, newName });
+  try {
+    const parentPath = path.dirname(oldPath);
+    const newPath = path.join(parentPath, newName);
+    
+    // Verificar que la nueva ruta no existe
+    if (fs.existsSync(newPath)) {
+      logger.error('La carpeta de destino ya existe', { newPath });
+      return false;
+    }
+    
+    await fs.promises.rename(oldPath, newPath);
+    logger.info('Carpeta renombrada exitosamente', { oldPath, newPath });
+    return true;
+  } catch (error) {
+    logger.error('Error renombrando carpeta', error);
+    return false;
+  }
+});
+
 // Mover archivo a la papelera
 ipcMain.handle('move-to-trash', async (event, filePath: string) => {
   logger.info('IPC: move-to-trash', { filePath });
@@ -375,6 +398,52 @@ ipcMain.handle('move-to-trash', async (event, filePath: string) => {
     return true;
   } catch (error) {
     logger.error('Error moviendo archivo a la papelera', error);
+    return false;
+  }
+});
+
+// Mostrar archivo en el explorador
+ipcMain.handle('show-item-in-folder', async (event, filePath: string) => {
+  logger.info('IPC: show-item-in-folder', { filePath });
+  try {
+    shell.showItemInFolder(filePath);
+    return true;
+  } catch (error) {
+    logger.error('Error mostrando archivo en explorador', error);
+    return false;
+  }
+});
+
+// Abrir ruta en el explorador
+ipcMain.handle('open-path', async (event, dirPath: string) => {
+  logger.info('IPC: open-path', { dirPath });
+  try {
+    await shell.openPath(dirPath);
+    return true;
+  } catch (error) {
+    logger.error('Error abriendo ruta', error);
+    return false;
+  }
+});
+
+// Copiar imagen al portapapeles
+ipcMain.handle('copy-image-to-clipboard', async (event, filePath: string) => {
+  logger.info('IPC: copy-image-to-clipboard', { filePath });
+  try {
+    const { nativeImage, clipboard } = require('electron');
+    
+    // Procesar imagen con Sharp para aplicar rotación EXIF
+    const buffer = await sharp(filePath)
+      .rotate() // Auto-rotate based on EXIF Orientation
+      .toBuffer();
+    
+    // Crear nativeImage desde el buffer procesado
+    const image = nativeImage.createFromBuffer(buffer);
+    clipboard.writeImage(image);
+    logger.info('Imagen copiada al portapapeles con orientación correcta', { filePath });
+    return true;
+  } catch (error) {
+    logger.error('Error copiando imagen al portapapeles', error);
     return false;
   }
 });

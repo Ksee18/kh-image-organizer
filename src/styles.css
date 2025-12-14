@@ -1565,3 +1565,34 @@ body {
   line-height: 1.4;
   min-height: 32px;
 }
+
+/* Menú contextual */
+.context-menu {
+  position: fixed;
+  background: #2d2d30;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 10000;
+  min-width: 180px;
+  padding: 4px 0;
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  color: #cccccc;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.15s;
+}
+
+.context-menu-item:hover {
+  background-color: #094771;
+  color: #ffffff;
+}
+
+.context-menu-item span {
+  user-select: none;
+}

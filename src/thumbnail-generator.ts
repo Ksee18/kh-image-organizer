@@ -30,6 +30,7 @@ async function generateThumbnail(
   size: number
 ): Promise<void> {
   await sharp(inputPath)
+    .rotate() // Auto-rotate based on EXIF Orientation
     .resize(size, size, {
       fit: 'cover',
       position: 'center',
