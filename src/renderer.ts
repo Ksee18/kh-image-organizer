@@ -45,8 +45,22 @@ let generatingThumbnails: number = 0;
 let isGeneratingBatch: boolean = false;
 
 // Sistema de filtros
-type SortOrder = 'name-asc' | 'name-desc' | 'created-asc' | 'created-desc' | 'date-asc' | 'date-desc' | 'size-asc' | 'size-desc';
+type SortOrder = 'name-asc' | 'name-desc' | 'created-asc' | 'created-desc' | 'date-asc' | 'date-desc' | 'size-asc' | 'size-desc' | 'explorer-order';
 let currentSortOrder: SortOrder = 'name-asc';
+
+// Sistema de etiquetas
+let keywordsCategories: Array<{name: string, tags: string[]}> = [];
+let isSidebarRightOpen: boolean = false;
+let currentImageTags: string[] = [];
+let currentImageRating: number = 0;
+
+// Sistema de filtros
+let filterIncludeSubdirs: boolean = false;
+let filterSelectedRating: number | null = null;
+let filterSelectedTags: string[] = [];
+let filterNoMetadata: boolean = false; // Filtro para imágenes sin metadata
+let filteredImages: string[] = [];
+let isFilterActive: boolean = false;
 
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
@@ -97,6 +111,26 @@ const duplicateScanBtn = document.getElementById('duplicate-scan-btn') as HTMLBu
 const filterBtn = document.getElementById('filter-btn') as HTMLButtonElement;
 const filterMenu = document.getElementById('filter-menu') as HTMLElement;
 
+// Sidebar derecha (etiquetas)
+const tagsBtn = document.getElementById('tags-btn') as HTMLButtonElement;
+const sidebarRight = document.getElementById('sidebar-right') as HTMLElement;
+const closeSidebarRightBtn = document.getElementById('close-sidebar-right') as HTMLButtonElement;
+const tabAddTags = document.getElementById('tab-add-tags') as HTMLButtonElement;
+const tabFilterTags = document.getElementById('tab-filter-tags') as HTMLButtonElement;
+const contentAddTags = document.getElementById('content-add-tags') as HTMLElement;
+const contentFilterTags = document.getElementById('content-filter-tags') as HTMLElement;
+const ratingStars = document.getElementById('rating-stars') as HTMLElement;
+const btnAddCategory = document.getElementById('btn-add-category') as HTMLButtonElement;
+const categoriesList = document.getElementById('categories-list') as HTMLElement;
+const otherTagsList = document.getElementById('other-tags-list') as HTMLElement;
+const btnFilterCurrentDir = document.getElementById('btn-filter-current-dir') as HTMLButtonElement;
+const btnFilterSubdirs = document.getElementById('btn-filter-subdirs') as HTMLButtonElement;
+const filterModeSelection = document.getElementById('filter-mode-selection') as HTMLElement;
+const filterCriteriaSection = document.getElementById('filter-criteria-section') as HTMLElement;
+const btnBackToFilterMode = document.getElementById('btn-back-to-filter-mode') as HTMLButtonElement;
+const filterRatingOptions = document.getElementById('filter-rating-options') as HTMLElement;
+const filterTagsList = document.getElementById('filter-tags-list') as HTMLElement;
+
 // Modal organizar por año
 const organizeYearModal = document.getElementById('organize-year-modal') as HTMLElement;
 const organizeYearYesBtn = document.getElementById('organize-year-yes-btn') as HTMLButtonElement;
@@ -132,6 +166,22 @@ const cacheConfirmModal = document.getElementById('cache-confirm-modal') as HTML
 const cacheConfirmText = document.getElementById('cache-size-info') as HTMLElement;
 const cacheSaveBtn = document.getElementById('cache-save-btn') as HTMLButtonElement;
 const cacheDontSaveBtn = document.getElementById('cache-dont-save-btn') as HTMLButtonElement;
+
+// Modales de etiquetas
+const addCategoryModal = document.getElementById('add-category-modal') as HTMLElement;
+const addCategoryInput = document.getElementById('add-category-input') as HTMLInputElement;
+const saveCategoryBtn = document.getElementById('save-category-btn') as HTMLButtonElement;
+const addTagModal = document.getElementById('add-tag-modal') as HTMLElement;
+const addTagInput = document.getElementById('add-tag-input') as HTMLInputElement;
+const saveTagBtn = document.getElementById('save-tag-btn') as HTMLButtonElement;
+const deleteCategoryModal = document.getElementById('delete-category-modal') as HTMLElement;
+const deleteCategoryName = document.getElementById('delete-category-name') as HTMLElement;
+const confirmDeleteCategoryBtn = document.getElementById('confirm-delete-category-btn') as HTMLButtonElement;
+const cancelDeleteCategoryBtn = document.getElementById('cancel-delete-category-btn') as HTMLButtonElement;
+
+// Variables para agregar tag
+let currentCategoryIndexForTag: number = -1;
+let deleteCategoryIndex: number = -1;
 
 // Menú contextual
 const imageContextMenu = document.getElementById('image-context-menu') as HTMLElement;
@@ -437,8 +487,10 @@ if (renameFolderModal) {
 }
 
 // Actualizar el mensaje del empty-state
-function updateEmptyStateMessage(hasDirectory: boolean) {
-  if (hasDirectory) {
+function updateEmptyStateMessage(hasDirectory: boolean, customMessage?: string) {
+  if (customMessage) {
+    emptyStateText.textContent = customMessage;
+  } else if (hasDirectory) {
     emptyStateText.textContent = 'Este directorio no tiene imágenes, prueba cambiar a otro';
   } else {
     emptyStateText.textContent = 'Haz click aquí para seleccionar el directorio a organizar';
@@ -523,12 +575,22 @@ async function loadDirectory(directoryPath: string) {
       imageView.style.display = 'flex';
       showImage(currentImages[currentImageIndex]);
       await initializeCarousel();
+      
+      // Habilitar botón de etiquetas
+      if (tagsBtn) {
+        tagsBtn.disabled = false;
+      }
     } else {
       // No hay imágenes en el directorio
       console.log('[RENDERER] No hay imágenes en el directorio');
       imageView.style.display = 'none';
       updateEmptyStateMessage(true);
       emptyState.style.display = 'flex';
+      
+      // Habilitar botón de etiquetas para permitir filtrado en subdirectorios
+      if (tagsBtn) {
+        tagsBtn.disabled = false;
+      }
     }
   } catch (error) {
     console.error('[Renderer] Error:', error);
@@ -570,6 +632,11 @@ function showImage(imagePath: string) {
   
   updateActiveCarouselItem();
   scrollCarouselToIndex(currentImageIndex);
+  
+  // Actualizar sidebar de etiquetas si está abierta
+  if (isSidebarRightOpen) {
+    loadImageTagsAndRating();
+  }
 }
 
 async function initializeCarousel() {
@@ -832,6 +899,12 @@ function closeDirectory() {
   
   // Actualizar botón de directorio padre
   updateParentDirectoryButton();
+  
+  // Cerrar sidebar de etiquetas y deshabilitar botón
+  closeSidebarRight();
+  if (tagsBtn) {
+    tagsBtn.disabled = true;
+  }
 }
 
 // Funciones auxiliares
@@ -1802,6 +1875,845 @@ if (filterBtn && filterMenu) {
       }
     });
   });
+}
+
+// ========== SISTEMA DE ETIQUETAS ==========
+
+// Event listener para botón de etiquetas
+if (tagsBtn) {
+  tagsBtn.addEventListener('click', () => {
+    toggleSidebarRight();
+  });
+}
+
+// Event listener para cerrar sidebar derecha
+if (closeSidebarRightBtn) {
+  closeSidebarRightBtn.addEventListener('click', () => {
+    closeSidebarRight();
+  });
+}
+
+// Event listeners para tabs
+if (tabAddTags) {
+  tabAddTags.addEventListener('click', () => {
+    switchTab('add');
+  });
+}
+
+if (tabFilterTags) {
+  tabFilterTags.addEventListener('click', () => {
+    switchTab('filter');
+  });
+}
+
+// Event listeners para estrellas de calificación
+if (ratingStars) {
+  const starBtns = ratingStars.querySelectorAll('.star-btn');
+  starBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const rating = parseInt(btn.getAttribute('data-rating') || '0', 10);
+      await setImageRating(rating);
+    });
+  });
+}
+
+// Event listener para botón agregar categoría
+if (btnAddCategory) {
+  btnAddCategory.addEventListener('click', () => {
+    promptAddCategory();
+  });
+}
+
+// Event listeners para botones de filtros
+if (btnFilterCurrentDir) {
+  btnFilterCurrentDir.addEventListener('click', async () => {
+    filterIncludeSubdirs = false;
+    await showFilterCriteria();
+  });
+}
+
+if (btnFilterSubdirs) {
+  btnFilterSubdirs.addEventListener('click', async () => {
+    filterIncludeSubdirs = true;
+    await showFilterCriteria();
+  });
+}
+
+// Event listener para botón de volver
+if (btnBackToFilterMode) {
+  btnBackToFilterMode.addEventListener('click', () => {
+    hideFilterCriteria();
+  });
+}
+
+function toggleSidebarRight() {
+  if (isSidebarRightOpen) {
+    closeSidebarRight();
+  } else {
+    openSidebarRight();
+  }
+}
+
+async function openSidebarRight() {
+  // Verificar si exiftool está instalado
+  const exiftoolInstalled = await window.electronAPI.checkExiftoolInstalled();
+  if (!exiftoolInstalled) {
+    alert('ExifTool no está instalado.\n\nPara usar etiquetas y calificaciones, descarga ExifTool desde:\nhttps://exiftool.org/\n\nLuego copia exiftool.exe a C:\\Windows\\exiftool.exe');
+    return;
+  }
+  
+  sidebarRight.style.display = 'flex';
+  isSidebarRightOpen = true;
+  tagsBtn.classList.add('active');
+  
+  // Si no hay imágenes, cambiar automáticamente a la tab de filtro
+  if (currentImages.length === 0) {
+    switchTab('filter');
+  } else {
+    // Cargar datos de la imagen actual
+    loadImageTagsAndRating();
+  }
+}
+
+function closeSidebarRight() {
+  sidebarRight.style.display = 'none';
+  isSidebarRightOpen = false;
+  tagsBtn.classList.remove('active');
+}
+
+function switchTab(tab: 'add' | 'filter') {
+  if (tab === 'add') {
+    tabAddTags.classList.add('active');
+    tabFilterTags.classList.remove('active');
+    contentAddTags.style.display = 'flex';
+    contentFilterTags.style.display = 'none';
+  } else {
+    tabAddTags.classList.remove('active');
+    tabFilterTags.classList.add('active');
+    contentAddTags.style.display = 'none';
+    contentFilterTags.style.display = 'flex';
+  }
+}
+
+async function loadImageTagsAndRating() {
+  if (!currentImages[currentImageIndex]) return;
+  
+  const imagePath = currentImages[currentImageIndex];
+  
+  console.log('[Tags] Cargando tags y rating de imagen:', imagePath);
+  
+  // Obtener metadatos (tags y rating)
+  const metadata = await window.electronAPI.getImageTagsAndRating(imagePath);
+  
+  console.log('[Tags] Metadatos recibidos:', metadata);
+  
+  currentImageTags = metadata.tags || [];
+  currentImageRating = metadata.rating || 0;
+  
+  console.log('[Tags] Tags:', currentImageTags);
+  console.log('[Rating] Rating:', currentImageRating);
+  
+  // Actualizar UI
+  updateRatingStars(currentImageRating);
+  await loadKeywordsCategories();
+  updateCategoriesUI();
+  updateOtherTagsUI();
+}
+
+function updateRatingStars(rating: number) {
+  const starBtns = ratingStars.querySelectorAll('.star-btn');
+  starBtns.forEach((btn, index) => {
+    if (index < rating) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function setImageRating(rating: number) {
+  if (!currentImages[currentImageIndex]) return;
+  
+  const imagePath = currentImages[currentImageIndex];
+  
+  console.log('[Rating] Click en estrella, rating actual:', currentImageRating, 'nuevo rating:', rating);
+  
+  // Guardar el rating anterior por si necesitamos revertir
+  const previousRating = currentImageRating;
+  
+  // Si se hace clic en la misma estrella, quitar calificación
+  if (rating === currentImageRating) {
+    rating = 0;
+  }
+  
+  // Actualizar el rating y la UI inmediatamente
+  currentImageRating = rating;
+  updateRatingStars(rating);
+  
+  console.log('[Rating] Guardando rating:', rating, 'en imagen:', imagePath);
+  
+  // Guardar en metadatos en segundo plano
+  window.electronAPI.setImageRating(imagePath, rating)
+    .then(result => {
+      console.log('[Rating] Resultado de guardado:', result);
+      if (!result) {
+        // Si falla, revertir cambios
+        currentImageRating = previousRating;
+        updateRatingStars(previousRating);
+        alert('Error al guardar la calificación en la imagen');
+      }
+    })
+    .catch(error => {
+      console.error('[Rating] Error guardando rating:', error);
+      // Revertir cambios
+      currentImageRating = previousRating;
+      updateRatingStars(previousRating);
+      alert('Error al guardar la calificación en la imagen');
+    });
+}
+
+async function loadKeywordsCategories() {
+  // Obtener categorías del XML
+  const categories = await window.electronAPI.getKeywordsCategories();
+  keywordsCategories = categories || [];
+}
+
+function updateCategoriesUI() {
+  categoriesList.innerHTML = '';
+  
+  keywordsCategories.forEach((category, categoryIndex) => {
+    const categoryItem = document.createElement('div');
+    categoryItem.className = 'category-item';
+    
+    const categoryHeader = document.createElement('div');
+    categoryHeader.className = 'category-header';
+    
+    const categoryTitle = document.createElement('div');
+    categoryTitle.className = 'category-title';
+    categoryTitle.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M7 10l5 5 5-5z"/>
+      </svg>
+      <span>${category.name}</span>
+    `;
+    
+    const btnAdd = document.createElement('button');
+    btnAdd.className = 'btn-add-tag';
+    btnAdd.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    `;
+    btnAdd.title = 'Agregar nueva etiqueta';
+    btnAdd.addEventListener('click', (e) => {
+      e.stopPropagation();
+      promptAddTag(categoryIndex);
+    });
+    
+    const btnDelete = document.createElement('button');
+    btnDelete.className = 'btn-delete-category';
+    btnDelete.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    `;
+    btnDelete.title = 'Eliminar categoría';
+    btnDelete.addEventListener('click', (e) => {
+      e.stopPropagation();
+      promptDeleteCategory(categoryIndex);
+    });
+    
+    categoryTitle.appendChild(btnAdd);
+    categoryHeader.appendChild(categoryTitle);
+    categoryHeader.appendChild(btnDelete);
+    
+    const tagsList = document.createElement('div');
+    tagsList.className = 'tags-list';
+    
+    category.tags.forEach(tag => {
+      const tagItem = document.createElement('div');
+      tagItem.className = 'tag-checkbox-item';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `tag-${categoryIndex}-${tag}`;
+      checkbox.checked = currentImageTags.includes(tag);
+      
+      const label = document.createElement('label');
+      label.htmlFor = `tag-${categoryIndex}-${tag}`;
+      label.textContent = tag;
+      
+      tagItem.appendChild(checkbox);
+      tagItem.appendChild(label);
+      
+      // Manejar el click en el item completo
+      tagItem.addEventListener('click', (e) => {
+        e.preventDefault(); // Prevenir el comportamiento por defecto
+        // Calcular el nuevo estado basándose en si el tag está en el array
+        const isCurrentlyTagged = currentImageTags.includes(tag);
+        const shouldAdd = !isCurrentlyTagged;
+        toggleImageTag(tag, shouldAdd);
+      });
+      
+      // Prevenir que el checkbox cambie por sí mismo
+      checkbox.addEventListener('click', (e) => {
+        e.preventDefault();
+      });
+      
+      tagsList.appendChild(tagItem);
+    });
+    
+    categoryHeader.addEventListener('click', () => {
+      categoryItem.classList.toggle('collapsed');
+    });
+    
+    categoryItem.appendChild(categoryHeader);
+    categoryItem.appendChild(tagsList);
+    categoriesList.appendChild(categoryItem);
+  });
+}
+
+function updateOtherTagsUI() {
+  otherTagsList.innerHTML = '';
+  
+  // Obtener etiquetas que no están en ninguna categoría
+  const allCategoryTags = keywordsCategories.flatMap(cat => cat.tags);
+  const otherTags = currentImageTags.filter(tag => !allCategoryTags.includes(tag));
+  
+  if (otherTags.length === 0) {
+    otherTagsList.innerHTML = '<p style="color: #666; font-size: 11px; margin: 0;">Sin etiquetas adicionales</p>';
+    return;
+  }
+  
+  otherTags.forEach(tag => {
+    const chip = document.createElement('span');
+    chip.className = 'other-tag-chip';
+    chip.textContent = tag;
+    otherTagsList.appendChild(chip);
+  });
+}
+
+function toggleImageTag(tag: string, add: boolean) {
+  if (!currentImages[currentImageIndex]) return;
+  
+  const imagePath = currentImages[currentImageIndex];
+  
+  console.log('[Tags] toggleImageTag - tag:', tag, 'add:', add);
+  console.log('[Tags] currentImageTags ANTES:', currentImageTags);
+  
+  // Guardar el estado anterior por si necesitamos revertir
+  const previousTags = [...currentImageTags];
+  
+  // Actualizar el array inmediatamente
+  if (add) {
+    if (!currentImageTags.includes(tag)) {
+      currentImageTags.push(tag);
+    }
+  } else {
+    currentImageTags = currentImageTags.filter(t => t !== tag);
+  }
+  
+  console.log('[Tags] currentImageTags DESPUES:', currentImageTags);
+  
+  // Actualizar la UI inmediatamente para feedback visual instantáneo
+  updateCategoriesUI();
+  updateOtherTagsUI();
+  
+  // Guardar en metadatos en segundo plano
+  console.log('[Tags] Guardando tags en imagen:', imagePath, currentImageTags);
+  window.electronAPI.setImageTags(imagePath, currentImageTags)
+    .then(result => {
+      console.log('[Tags] Resultado de guardado:', result);
+      if (!result) {
+        // Si falla, revertir cambios
+        currentImageTags = previousTags;
+        updateCategoriesUI();
+        updateOtherTagsUI();
+        alert('Error al guardar las etiquetas en la imagen');
+      }
+    })
+    .catch(error => {
+      console.error('[Tags] Error guardando tags:', error);
+      // Revertir cambios
+      currentImageTags = previousTags;
+      updateCategoriesUI();
+      updateOtherTagsUI();
+      alert('Error al guardar las etiquetas en la imagen');
+    });
+}
+
+function promptAddCategory() {
+  // Abrir modal
+  addCategoryInput.value = '';
+  quickNavigationEnabled = false;
+  addCategoryModal.style.display = 'flex';
+  addCategoryInput.focus();
+}
+
+async function addCategory(name: string) {
+  if (!name || !name.trim()) return;
+  
+  console.log('[Tags] Agregando categoría:', name);
+  
+  // Agregar a la lista local
+  keywordsCategories.push({ name: name.trim(), tags: [] });
+  
+  // Guardar en XML
+  const result = await window.electronAPI.saveKeywordsCategories(keywordsCategories);
+  console.log('[Tags] Categoría guardada:', result);
+  
+  // Actualizar UI
+  updateCategoriesUI();
+}
+
+function promptDeleteCategory(categoryIndex: number) {
+  if (categoryIndex < 0 || categoryIndex >= keywordsCategories.length) return;
+  
+  deleteCategoryIndex = categoryIndex;
+  deleteCategoryName.textContent = keywordsCategories[categoryIndex].name;
+  quickNavigationEnabled = false;
+  deleteCategoryModal.style.display = 'flex';
+}
+
+async function deleteCategory() {
+  if (deleteCategoryIndex < 0 || deleteCategoryIndex >= keywordsCategories.length) return;
+  
+  console.log('[Tags] Eliminando categoría:', keywordsCategories[deleteCategoryIndex].name);
+  
+  // Eliminar de la lista local
+  keywordsCategories.splice(deleteCategoryIndex, 1);
+  
+  // Guardar en XML
+  const result = await window.electronAPI.saveKeywordsCategories(keywordsCategories);
+  console.log('[Tags] Categoría eliminada:', result);
+  
+  // Actualizar UI
+  updateCategoriesUI();
+  
+  // Cerrar modal
+  deleteCategoryModal.style.display = 'none';
+  quickNavigationEnabled = true;
+  deleteCategoryIndex = -1;
+}
+
+function promptAddTag(categoryIndex: number) {
+  // Guardar índice de categoría
+  currentCategoryIndexForTag = categoryIndex;
+  
+  // Abrir modal
+  addTagInput.value = '';
+  quickNavigationEnabled = false;
+  addTagModal.style.display = 'flex';
+  addTagInput.focus();
+}
+
+async function addTag(categoryIndex: number, tagName: string) {
+  if (categoryIndex < 0 || categoryIndex >= keywordsCategories.length) return;
+  if (!tagName || !tagName.trim()) return;
+  
+  console.log('[Tags] Agregando etiqueta:', tagName, 'a categoría:', categoryIndex);
+  
+  // Agregar a la categoría
+  if (!keywordsCategories[categoryIndex].tags.includes(tagName.trim())) {
+    keywordsCategories[categoryIndex].tags.push(tagName.trim());
+    
+    // Guardar en XML
+    const result = await window.electronAPI.saveKeywordsCategories(keywordsCategories);
+    console.log('[Tags] Etiqueta guardada:', result);
+    
+    // Actualizar UI
+    updateCategoriesUI();
+  }
+}
+
+// Event listeners para modales de agregar
+if (saveCategoryBtn) {
+  saveCategoryBtn.addEventListener('click', () => {
+    const name = addCategoryInput.value;
+    if (name.trim()) {
+      addCategory(name.trim());
+      addCategoryModal.style.display = 'none';
+      quickNavigationEnabled = true;
+    }
+  });
+}
+
+if (addCategoryInput) {
+  addCategoryInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const name = addCategoryInput.value;
+      if (name.trim()) {
+        addCategory(name.trim());
+        addCategoryModal.style.display = 'none';
+        quickNavigationEnabled = true;
+      }
+    } else if (e.key === 'Escape') {
+      addCategoryModal.style.display = 'none';
+      quickNavigationEnabled = true;
+    }
+  });
+}
+
+if (saveTagBtn) {
+  saveTagBtn.addEventListener('click', () => {
+    const name = addTagInput.value;
+    if (name.trim() && currentCategoryIndexForTag >= 0) {
+      addTag(currentCategoryIndexForTag, name.trim());
+      addTagModal.style.display = 'none';
+      currentCategoryIndexForTag = -1;
+      quickNavigationEnabled = true;
+    }
+  });
+}
+
+if (addTagInput) {
+  addTagInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const name = addTagInput.value;
+      if (name.trim() && currentCategoryIndexForTag >= 0) {
+        addTag(currentCategoryIndexForTag, name.trim());
+        addTagModal.style.display = 'none';
+        currentCategoryIndexForTag = -1;
+        quickNavigationEnabled = true;
+      }
+    } else if (e.key === 'Escape') {
+      addTagModal.style.display = 'none';
+      quickNavigationEnabled = true;
+    }
+  });
+}
+
+// Cerrar modales al hacer clic fuera
+if (addCategoryModal) {
+  addCategoryModal.addEventListener('click', (e) => {
+    if (e.target === addCategoryModal) {
+      addCategoryModal.style.display = 'none';
+      quickNavigationEnabled = true;
+    }
+  });
+}
+
+if (addTagModal) {
+  addTagModal.addEventListener('click', (e) => {
+    if (e.target === addTagModal) {
+      addTagModal.style.display = 'none';
+      currentCategoryIndexForTag = -1;
+      quickNavigationEnabled = true;
+    }
+  });
+}
+
+// Event listeners para modal de eliminar categoría
+if (confirmDeleteCategoryBtn) {
+  confirmDeleteCategoryBtn.addEventListener('click', deleteCategory);
+}
+
+if (cancelDeleteCategoryBtn) {
+  cancelDeleteCategoryBtn.addEventListener('click', () => {
+    deleteCategoryModal.style.display = 'none';
+    quickNavigationEnabled = true;
+    deleteCategoryIndex = -1;
+  });
+}
+
+if (deleteCategoryModal) {
+  deleteCategoryModal.addEventListener('click', (e) => {
+    if (e.target === deleteCategoryModal) {
+      deleteCategoryModal.style.display = 'none';
+      quickNavigationEnabled = true;
+      deleteCategoryIndex = -1;
+    }
+  });
+}
+
+// ========== SISTEMA DE FILTROS ==========
+
+async function showFilterCriteria() {
+  filterModeSelection.style.display = 'none';
+  filterCriteriaSection.style.display = 'block';
+  
+  // Cargar categorías del XML si aún no están cargadas
+  if (keywordsCategories.length === 0) {
+    await loadKeywordsCategories();
+  }
+  
+  // Cargar etiquetas en la lista de filtros
+  loadFilterTagsList();
+  
+  // Configurar event listeners para las calificaciones
+  setupFilterRatingListeners();
+}
+
+function hideFilterCriteria() {
+  filterModeSelection.style.display = 'flex';
+  filterCriteriaSection.style.display = 'none';
+  
+  // Limpiar filtros
+  clearFilters();
+}
+
+function loadFilterTagsList() {
+  filterTagsList.innerHTML = '';
+  
+  keywordsCategories.forEach(category => {
+    // Añadir título de categoría
+    const categoryTitle = document.createElement('div');
+    categoryTitle.style.cssText = 'color: #fff; font-size: 13px; font-weight: 500; margin-top: 15px; margin-bottom: 8px;';
+    categoryTitle.textContent = category.name;
+    filterTagsList.appendChild(categoryTitle);
+    
+    // Añadir etiquetas de la categoría
+    category.tags.forEach(tag => {
+      const tagItem = document.createElement('div');
+      tagItem.className = 'filter-tag-item';
+      
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.id = `filter-tag-${tag}`;
+      checkbox.value = tag;
+      checkbox.checked = filterSelectedTags.includes(tag);
+      
+      const label = document.createElement('label');
+      label.htmlFor = `filter-tag-${tag}`;
+      label.textContent = tag;
+      
+      tagItem.appendChild(checkbox);
+      tagItem.appendChild(label);
+      
+      // Event listener para cambios en el checkbox
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          if (!filterSelectedTags.includes(tag)) {
+            filterSelectedTags.push(tag);
+          }
+        } else {
+          filterSelectedTags = filterSelectedTags.filter(t => t !== tag);
+        }
+        applyFilters();
+      });
+      
+      filterTagsList.appendChild(tagItem);
+    });
+  });
+}
+
+function setupFilterRatingListeners() {
+  const ratingRows = filterRatingOptions.querySelectorAll('.filter-rating-row');
+  const noMetadataRow = document.getElementById('filter-no-metadata');
+  
+  ratingRows.forEach(row => {
+    row.addEventListener('click', () => {
+      const ratingAttr = row.getAttribute('data-rating');
+      
+      // Manejar caso especial de "sin metadata"
+      if (row.id === 'filter-no-metadata') {
+        // Deseleccionar todas las filas normales
+        ratingRows.forEach(r => {
+          if (r.id !== 'filter-no-metadata') {
+            r.classList.remove('selected');
+            const stars = r.querySelectorAll('.filter-star');
+            stars.forEach(star => {
+              star.textContent = '☆';
+            });
+          }
+        });
+        
+        if (filterNoMetadata) {
+          filterNoMetadata = false;
+          filterSelectedRating = null;
+          row.classList.remove('selected');
+        } else {
+          filterNoMetadata = true;
+          filterSelectedRating = null;
+          row.classList.add('selected');
+        }
+        
+        applyFilters();
+        return;
+      }
+      
+      const rating = parseInt(ratingAttr || '0');
+      
+      // Si se hace clic en la misma calificación, deseleccionar
+      if (filterSelectedRating === rating) {
+        filterSelectedRating = null;
+        filterNoMetadata = false;
+        row.classList.remove('selected');
+        
+        // Cambiar todas las estrellas de vuelta a vacías
+        const stars = row.querySelectorAll('.filter-star');
+        stars.forEach(star => {
+          star.textContent = '☆';
+        });
+      } else {
+        // Deseleccionar todas las filas y restaurar estrellas vacías
+        filterNoMetadata = false;
+        ratingRows.forEach(r => {
+          r.classList.remove('selected');
+          const stars = r.querySelectorAll('.filter-star');
+          stars.forEach(star => {
+            star.textContent = '☆';
+          });
+        });
+        
+        // Seleccionar la nueva fila y llenar todas sus estrellas
+        filterSelectedRating = rating;
+        row.classList.add('selected');
+        
+        const stars = row.querySelectorAll('.filter-star');
+        stars.forEach(star => {
+          star.textContent = '★';
+        });
+      }
+      
+      applyFilters();
+    });
+  });
+}
+
+async function applyFilters() {
+  if (!currentDirectory) return;
+  
+  console.log('[Filtros] Aplicando filtros - Rating:', filterSelectedRating, 'Tags:', filterSelectedTags, 'NoMetadata:', filterNoMetadata, 'Subdirs:', filterIncludeSubdirs);
+  
+  // Si no hay filtros activos, mostrar todas las imágenes del directorio actual
+  if (filterSelectedRating === null && filterSelectedTags.length === 0 && !filterNoMetadata) {
+    isFilterActive = false;
+    filteredImages = [];
+    await loadDirectory(currentDirectory);
+    return;
+  }
+  
+  // Mostrar estado de carga
+  imageView.style.display = 'none';
+  emptyState.style.display = 'flex';
+  updateEmptyStateMessage(true, 'Cargando...');
+  
+  isFilterActive = true;
+  
+  // Obtener todas las imágenes del directorio (y subdirectorios si aplica)
+  let allImages: string[] = [];
+  
+  if (filterIncludeSubdirs) {
+    // Búsqueda recursiva en subdirectorios
+    allImages = await window.electronAPI.getImagesFromDirectoryRecursive(currentDirectory);
+  } else {
+    allImages = await window.electronAPI.getImagesFromDirectory(currentDirectory);
+  }
+  
+  console.log('[Filtros] Total de imágenes a analizar:', allImages.length);
+  
+  // Filtrar imágenes según los criterios usando procesamiento por lotes
+  const filtered: string[] = [];
+  const BATCH_SIZE = 100; // Procesar 100 imágenes a la vez
+  
+  for (let i = 0; i < allImages.length; i += BATCH_SIZE) {
+    const batch = allImages.slice(i, i + BATCH_SIZE);
+    
+    try {
+      // Leer metadatos de todo el lote en una sola llamada
+      const batchResults = await window.electronAPI.getImagesTagsAndRatingBatch(batch);
+      
+      // Filtrar los resultados del lote
+      for (const metadata of batchResults) {
+        let matches = true;
+        
+        // Filtro especial: imágenes sin metadata
+        if (filterNoMetadata) {
+          if (metadata.rating !== 0 || metadata.tags.length !== 0) {
+            matches = false;
+          }
+        } else {
+          // Filtrar por calificación
+          if (filterSelectedRating !== null) {
+            if (metadata.rating !== filterSelectedRating) {
+              matches = false;
+            }
+          }
+          
+          // Filtrar por etiquetas (todas las etiquetas seleccionadas deben estar presentes)
+          if (filterSelectedTags.length > 0) {
+            const hasAllTags = filterSelectedTags.every(tag => metadata.tags.includes(tag));
+            if (!hasAllTags) {
+              matches = false;
+            }
+          }
+        }
+        
+        if (matches) {
+          filtered.push(metadata.path);
+        }
+      }
+      
+      // Actualizar mensaje de progreso
+      const progress = Math.min(i + BATCH_SIZE, allImages.length);
+      updateEmptyStateMessage(true, `Cargando... ${progress}/${allImages.length}`);
+      
+    } catch (error) {
+      console.error('[Filtros] Error leyendo metadatos del lote:', error);
+    }
+  }
+  
+  console.log('[Filtros] Imágenes filtradas:', filtered.length, 'de', allImages.length);
+  
+  filteredImages = filtered;
+  
+  // Actualizar el visor con las imágenes filtradas
+  if (filtered.length > 0) {
+    currentImages = filtered;
+    currentImageIndex = 0;
+    imageView.style.display = 'flex';
+    emptyState.style.display = 'none';
+    showImage(filtered[0]);
+    await initializeCarousel();
+    
+    // Habilitar botón de etiquetas
+    if (tagsBtn) {
+      tagsBtn.disabled = false;
+    }
+  } else {
+    // No hay imágenes que coincidan
+    currentImages = [];
+    currentImageIndex = 0;
+    imageView.style.display = 'none';
+    updateEmptyStateMessage(true, 'No se encontraron imágenes que coincidan con los filtros seleccionados');
+    emptyState.style.display = 'flex';
+    carouselTrack.innerHTML = '';
+    
+    // Deshabilitar botón de etiquetas
+    if (tagsBtn) {
+      tagsBtn.disabled = true;
+    }
+  }
+}
+
+function clearFilters() {
+  filterSelectedRating = null;
+  filterSelectedTags = [];
+  filterNoMetadata = false;
+  isFilterActive = false;
+  filteredImages = [];
+  
+  // Limpiar UI
+  const ratingRows = filterRatingOptions.querySelectorAll('.filter-rating-row');
+  ratingRows.forEach(r => {
+    r.classList.remove('selected');
+    // Restaurar estrellas vacías
+    const stars = r.querySelectorAll('.filter-star');
+    stars.forEach(star => {
+      star.textContent = '☆';
+    });
+  });
+  
+  const checkboxes = filterTagsList.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb => (cb as HTMLInputElement).checked = false);
+  
+  // Recargar imágenes del directorio actual
+  if (currentDirectory) {
+    loadDirectory(currentDirectory);
+  }
 }
 
 // Event listener para botón central del mouse (toggle drag mode)

@@ -168,6 +168,12 @@
         </button> -->
         <!-- Filtro (derecha) -->
         <div class="toolbar-right">
+          <button class="toolbar-btn" id="tags-btn" title="Etiquetas y calificación" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+              <line x1="7" y1="7" x2="7.01" y2="7"></line>
+            </svg>
+          </button>
           <div class="filter-dropdown">
             <button class="toolbar-btn" id="filter-btn" title="Ordenar imágenes">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -247,6 +253,169 @@
         </div>
       </div>
     </main>
+    
+    <!-- Sidebar derecha para etiquetas -->
+    <aside class="sidebar-right" id="sidebar-right" style="display: none;">
+      <div class="sidebar-right-header">
+        <div class="sidebar-right-tabs">
+          <button class="sidebar-tab active" id="tab-add-tags">Agregar</button>
+          <button class="sidebar-tab" id="tab-filter-tags">Filtrar</button>
+        </div>
+        <button class="sidebar-close-btn" id="close-sidebar-right" title="Cerrar">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="sidebar-right-content">
+        <!-- Tab: Agregar etiquetas -->
+        <div class="tab-content" id="content-add-tags">
+          <!-- Sección de calificación -->
+          <div class="rating-section">
+            <h4>Calificación:</h4>
+            <div class="rating-stars" id="rating-stars">
+              <button class="star-btn" data-rating="1" title="1 estrella">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+              </button>
+              <button class="star-btn" data-rating="2" title="2 estrellas">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+              </button>
+              <button class="star-btn" data-rating="3" title="3 estrellas">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+              </button>
+              <button class="star-btn" data-rating="4" title="4 estrellas">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+              </button>
+              <button class="star-btn" data-rating="5" title="5 estrellas">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="sidebar-divider"></div>
+          
+          <!-- Botón agregar categoría -->
+          <button class="btn-add-category" id="btn-add-category">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Agregar categoría
+          </button>
+          
+          <!-- Lista de categorías -->
+          <div class="categories-list" id="categories-list">
+            <!-- Las categorías se cargan dinámicamente aquí -->
+          </div>
+          
+          <div class="sidebar-divider"></div>
+          
+          <!-- Otras etiquetas -->
+          <div class="other-tags-section">
+            <h4>Otras etiquetas:</h4>
+            <div class="other-tags-list" id="other-tags-list">
+              <!-- Etiquetas no categorizadas se muestran aquí -->
+            </div>
+          </div>
+        </div>
+        
+        <!-- Tab: Filtrar (placeholder por ahora) -->
+        <div class="tab-content" id="content-filter-tags" style="display: none;">
+          <!-- Vista inicial: botones de opción -->
+          <div class="filter-buttons-section" id="filter-mode-selection">
+            <button class="btn-filter-option" id="btn-filter-current-dir">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              En este directorio
+            </button>
+            <button class="btn-filter-option" id="btn-filter-subdirs">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                <path d="M8 21v-6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v6"></path>
+              </svg>
+              Incluir subdirectorios
+            </button>
+          </div>
+
+          <!-- Vista de filtros: estrellas y etiquetas -->
+          <div id="filter-criteria-section" style="display: none;">
+            <!-- Filtros por calificación -->
+            <div class="filter-section">
+              <div class="filter-header">
+                <h4>Calificación:</h4>
+                <button class="btn-back-filter" id="btn-back-to-filter-mode">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                  </svg>
+                  <span>Volver</span>
+                </button>
+              </div>
+              <div class="filter-rating-options" id="filter-rating-options">
+                <div class="filter-rating-row" data-rating="5">
+                  <span class="filter-stars">
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                  </span>
+                </div>
+                <div class="filter-rating-row" data-rating="4">
+                  <span class="filter-stars">
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                  </span>
+                </div>
+                <div class="filter-rating-row" data-rating="3">
+                  <span class="filter-stars">
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                  </span>
+                </div>
+                <div class="filter-rating-row" data-rating="2">
+                  <span class="filter-stars">
+                    <span class="filter-star">☆</span>
+                    <span class="filter-star">☆</span>
+                  </span>
+                </div>
+                <div class="filter-rating-row" data-rating="1">
+                  <span class="filter-stars">
+                    <span class="filter-star">☆</span>
+                  </span>
+                </div>
+                <div class="filter-rating-row filter-no-metadata" id="filter-no-metadata">
+                  <span style="color: #999; font-size: 12px;">Sin calificación ni etiquetas</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Filtros por etiquetas -->
+            <div class="filter-section">
+              <h4>Etiquetas:</h4>
+              <div id="filter-tags-list">
+                <!-- Se llenarán dinámicamente desde el XML -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
   </div>
   
   <!-- Modal para nueva carpeta -->
@@ -472,6 +641,54 @@
         <div class="input-group">
           <input type="text" id="rename-folder-input" class="folder-input" placeholder="Nuevo nombre..." maxlength="255">
           <button class="btn-primary" id="save-rename-btn">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal agregar categoría -->
+  <div class="modal-overlay" id="add-category-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Nueva categoría</h3>
+      </div>
+      <div class="modal-body">
+        <label for="add-category-input">Nombre de la categoría:</label>
+        <div class="input-group">
+          <input type="text" id="add-category-input" class="folder-input" placeholder="Nombre..." maxlength="100">
+          <button class="btn-primary" id="save-category-btn">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal agregar etiqueta -->
+  <div class="modal-overlay" id="add-tag-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Nueva etiqueta</h3>
+      </div>
+      <div class="modal-body">
+        <label for="add-tag-input">Nombre de la etiqueta:</label>
+        <div class="input-group">
+          <input type="text" id="add-tag-input" class="folder-input" placeholder="Nombre..." maxlength="100">
+          <button class="btn-primary" id="save-tag-btn">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Modal confirmar eliminar categoría -->
+  <div class="modal-overlay" id="delete-category-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>¿Eliminar categoría?</h3>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 20px; color: #fff;">¿Estás seguro de que deseas eliminar la categoría "<span id="delete-category-name"></span>" y todas sus etiquetas?</p>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancel-delete-category-btn">Cancelar</button>
+          <button class="btn-danger" id="confirm-delete-category-btn">Eliminar</button>
         </div>
       </div>
     </div>

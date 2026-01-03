@@ -7,11 +7,100 @@ import { logger } from './logger';
 import { processThumbnailRequest, processThumbnailBatch, ThumbnailRequest } from './thumbnail-generator';
 import { getCacheSize } from './cache-utils';
 import { runCacheEviction, clearAllCache, startPeriodicEviction } from './cache-eviction';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 const { imageHash } = require('image-hash');
 
 const execPromise = promisify(exec);
+
+// Función para ejecutar exiftool pasando la ruta vía stdin para evitar problemas de codificación
+async function execExiftoolWithPath(args: string[], imagePath: string): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const exiftoolPath = 'C:\\Windows\\exiftool.exe';
+    
+    // Usar -@ para leer la ruta desde stdin
+    const finalArgs = [...args, '-@', '-'];
+    
+    const child = spawn(exiftoolPath, finalArgs, {
+      windowsHide: true,
+      env: {
+        ...process.env,
+      }
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString('utf8');
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString('utf8');
+    });
+
+    // Escribir la ruta al stdin en UTF-8
+    child.stdin.write(imagePath + '\n', 'utf8');
+    child.stdin.end();
+
+    child.on('close', (code) => {
+      if (code !== 0 && code !== null) {
+        const error: any = new Error(`ExifTool exited with code ${code}`);
+        error.code = code;
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+// Función para ejecutar exiftool con soporte UTF-8
+function execExiftool(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const exiftoolPath = 'C:\\Windows\\exiftool.exe';
+    
+    const child = spawn(exiftoolPath, args, {
+      windowsHide: true,
+      env: {
+        ...process.env,
+      }
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString('utf8');
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString('utf8');
+    });
+
+    child.on('close', (code) => {
+      if (code !== 0 && code !== null) {
+        const error: any = new Error(`ExifTool exited with code ${code}`);
+        error.code = code;
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+
+    child.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
 
 let mainWindow: BrowserWindow | null = null;
 let currentDirectory: string | null = null;
@@ -182,6 +271,41 @@ ipcMain.handle('get-images-from-directory', async (event, directoryPath: string)
     logger.error('Error leyendo directorio', error);
     return [];
   }
+});
+
+// Obtener imágenes recursivamente incluyendo subdirectorios
+ipcMain.handle('get-images-from-directory-recursive', async (event, directoryPath: string) => {
+  logger.info('IPC: get-images-from-directory-recursive', { directoryPath });
+  
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+  const allImages: string[] = [];
+  
+  async function scanDirectory(dirPath: string) {
+    try {
+      const items = await fsPromises.readdir(dirPath, { withFileTypes: true });
+      
+      for (const item of items) {
+        const itemPath = path.join(dirPath, item.name);
+        
+        if (item.isDirectory()) {
+          // Recursivamente escanear subdirectorio
+          await scanDirectory(itemPath);
+        } else if (item.isFile()) {
+          const ext = path.extname(item.name).toLowerCase();
+          if (imageExtensions.includes(ext)) {
+            allImages.push(itemPath);
+          }
+        }
+      }
+    } catch (error) {
+      logger.error('Error escaneando directorio recursivo', { dirPath, error });
+    }
+  }
+  
+  await scanDirectory(directoryPath);
+  
+  logger.info('Imágenes encontradas recursivamente', { count: allImages.length });
+  return allImages;
 });
 
 // Obtener subdirectorios
@@ -837,6 +961,381 @@ ipcMain.handle('run-cache-eviction', async () => {
     return true;
   } catch (error) {
     logger.error('Error ejecutando evicción', error);
+    return false;
+  }
+});
+
+// ========== HANDLERS PARA ETIQUETAS Y CALIFICACIONES ==========
+
+// Verificar si exiftool está instalado
+ipcMain.handle('check-exiftool-installed', async () => {
+  try {
+    const exiftoolPath = 'C:\\Windows\\exiftool.exe';
+    const exists = fs.existsSync(exiftoolPath);
+    logger.info('[ExifTool] Verificación de instalación:', exists);
+    return exists;
+  } catch (error) {
+    logger.error('[ExifTool] Error verificando instalación:', error);
+    return false;
+  }
+});
+
+// Obtener etiquetas y calificación de una imagen
+ipcMain.handle('get-image-tags-and-rating', async (event, imagePath: string) => {
+  try {
+    let tags: string[] = [];
+    let rating: number = 0;
+    
+    // Intentar usar exiftool para leer metadatos (más completo)
+    try {
+      // Leer múltiples campos de rating ya que Windows puede usar diferentes
+      const args = [
+        '-charset',
+        'filename=utf8',
+        '-Keywords',
+        '-Rating',
+        '-XMP:Rating',
+        '-EXIF:Rating',
+        '-MWG:Rating',
+        '-j'
+      ];
+      
+      const { stdout, stderr } = await execExiftoolWithPath(args, imagePath);
+      
+      const result = JSON.parse(stdout);
+      
+      if (result && result.length > 0) {
+        const data = result[0];
+        
+        // Leer Keywords
+        if (data.Keywords) {
+          if (Array.isArray(data.Keywords)) {
+            tags = data.Keywords;
+          } else if (typeof data.Keywords === 'string') {
+            // Puede venir como string separado por comas
+            tags = data.Keywords.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0);
+          }
+        }
+        
+        // Leer Rating - probar múltiples campos (Windows usa diferentes)
+        rating = parseInt(data['XMP:Rating'], 10) || 
+                parseInt(data.Rating, 10) || 
+                parseInt(data['EXIF:Rating'], 10) || 
+                parseInt(data['MWG:Rating'], 10) || 0;
+      }
+    } catch (exiftoolError: any) {
+      // Si exiftool no está disponible, intentar con Sharp (limitado)
+      logger.warn('[Tags] exiftool no disponible, usando Sharp (limitado):', exiftoolError.message);
+      
+      const metadata = await sharp(imagePath).metadata();
+      const xmp = metadata.xmp;
+      
+      if (xmp) {
+        const xmpString = xmp.toString();
+        
+        // Buscar dc:subject (keywords en XMP)
+        const subjectMatch = xmpString.match(/<dc:subject>[\s\S]*?<\/dc:subject>/);
+        if (subjectMatch) {
+          const bagMatch = subjectMatch[0].match(/<rdf:li>(.*?)<\/rdf:li>/g);
+          if (bagMatch) {
+            tags = bagMatch.map(item => item.replace(/<\/?rdf:li>/g, '').trim());
+          }
+        }
+        
+        // Buscar xmp:Rating
+        const ratingMatch = xmpString.match(/<xmp:Rating>(\d+)<\/xmp:Rating>/);
+        if (ratingMatch) {
+          rating = parseInt(ratingMatch[1], 10);
+        }
+      }
+    }
+    
+    return { tags, rating };
+  } catch (error) {
+    logger.error('Error leyendo tags y rating', error);
+    return { tags: [], rating: 0 };
+  }
+});
+
+// Obtener etiquetas y calificaciones de múltiples imágenes en batch (optimizado)
+ipcMain.handle('get-images-tags-and-rating-batch', async (event, imagePaths: string[]) => {
+  if (!imagePaths || imagePaths.length === 0) {
+    return [];
+  }
+  
+  try {
+    const args = [
+      '-charset',
+      'filename=utf8',
+      '-Keywords',
+      '-Rating',
+      '-XMP:Rating',
+      '-EXIF:Rating',
+      '-MWG:Rating',
+      '-j',
+      '-@',
+      '-'
+    ];
+    
+    const exiftoolPath = 'C:\\Windows\\exiftool.exe';
+    
+    const child = spawn(exiftoolPath, args, {
+      windowsHide: true,
+      env: {
+        ...process.env,
+      }
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString('utf8');
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString('utf8');
+    });
+
+    // Escribir todas las rutas al stdin, una por línea
+    for (const imagePath of imagePaths) {
+      child.stdin.write(imagePath + '\n', 'utf8');
+    }
+    child.stdin.end();
+
+    await new Promise((resolve, reject) => {
+      child.on('close', (code) => {
+        if (code !== 0 && code !== null) {
+          reject(new Error(`ExifTool exited with code ${code}`));
+        } else {
+          resolve(true);
+        }
+      });
+      child.on('error', (err) => {
+        reject(err);
+      });
+    });
+
+    const results = JSON.parse(stdout);
+    
+    // Procesar resultados
+    const processedResults = results.map((data: any) => {
+      let tags: string[] = [];
+      let rating: number = 0;
+      
+      // Leer Keywords
+      if (data.Keywords) {
+        if (Array.isArray(data.Keywords)) {
+          tags = data.Keywords;
+        } else if (typeof data.Keywords === 'string') {
+          tags = data.Keywords.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0);
+        }
+      }
+      
+      // Leer Rating
+      rating = parseInt(data['XMP:Rating'], 10) || 
+              parseInt(data.Rating, 10) || 
+              parseInt(data['EXIF:Rating'], 10) || 
+              parseInt(data['MWG:Rating'], 10) || 0;
+      
+      return {
+        path: data.SourceFile,
+        tags,
+        rating
+      };
+    });
+    
+    return processedResults;
+  } catch (error) {
+    logger.error('[Tags Batch] Error leyendo metadatos en batch:', error);
+    return [];
+  }
+});
+
+// Establecer calificación de una imagen
+ipcMain.handle('set-image-rating', async (event, imagePath: string, rating: number) => {
+  logger.info('[Rating] Intentando guardar rating', { imagePath, rating });
+  
+  try {
+    // Usar exiftool para escribir Rating en múltiples campos para compatibilidad con Windows
+    const args = [
+      '-charset',
+      'filename=utf8',
+      `-XMP:Rating=${rating}`,
+      `-Rating=${rating}`,
+      '-overwrite_original'
+    ];
+    
+    logger.info('[Rating] Ejecutando exiftool');
+    
+    const { stdout, stderr } = await execExiftoolWithPath(args, imagePath);
+    
+    logger.info('[Rating] stdout:', stdout);
+    if (stderr) {
+      logger.warn('[Rating] stderr:', stderr);
+    }
+    
+    // Verificar si exiftool tuvo éxito (buscar "image files updated")
+    if (stdout && stdout.includes('1 image files updated')) {
+      logger.info('[Rating] Rating guardado exitosamente', { imagePath, rating });
+      return true;
+    } else if (stderr && stderr.toLowerCase().includes('error')) {
+      logger.error('[Rating] Error en exiftool:', stderr);
+      return false;
+    } else {
+      logger.warn('[Rating] Respuesta inesperada de exiftool:', { stdout, stderr });
+      return false;
+    }
+  } catch (error: any) {
+    logger.error('[Rating] Error guardando rating:', {
+      error: error.message,
+      code: error.code,
+      stderr: error.stderr,
+      stdout: error.stdout,
+      cmd: error.cmd
+    });
+    
+    // Verificar si el error es porque exiftool no está instalado
+    if (error.message && (error.message.includes('not found') || error.code === 'ENOENT')) {
+      logger.error('[Rating] exiftool NO está instalado en el sistema');
+    }
+    
+    return false;
+  }
+});
+
+// Establecer etiquetas de una imagen
+ipcMain.handle('set-image-tags', async (event, imagePath: string, tags: string[]) => {
+  logger.info('[Tags] Intentando guardar tags', { imagePath, tags });
+  
+  try {
+    // Construir argumentos para exiftool
+    const args = [
+      '-charset',
+      'filename=utf8'
+    ];
+    
+    // Si no hay tags, limpiar keywords
+    if (tags.length === 0) {
+      args.push('-Keywords=');
+      args.push('-XMP:Subject=');
+    } else {
+      // Usar -sep para definir el separador y luego pasar todos los tags juntos
+      args.push('-sep');
+      args.push(',');
+      // Escribir en ambos campos para compatibilidad
+      args.push(`-Keywords=${tags.join(',')}`);
+      args.push(`-XMP:Subject=${tags.join(',')}`);
+    }
+    
+    // Agregar opciones finales
+    args.push('-overwrite_original');
+    
+    logger.info('[Tags] Ejecutando exiftool');
+    logger.info('[Tags] Tags a escribir:', tags);
+    
+    const { stdout, stderr } = await execExiftoolWithPath(args, imagePath);
+    
+    logger.info('[Tags] stdout:', stdout);
+    if (stderr) {
+      logger.warn('[Tags] stderr:', stderr);
+    }
+    
+    // Verificar si exiftool tuvo éxito (buscar "image files updated")
+    if (stdout && stdout.includes('1 image files updated')) {
+      logger.info('[Tags] Tags guardados exitosamente', { imagePath, tags });
+      return true;
+    } else if (stderr && stderr.toLowerCase().includes('error')) {
+      logger.error('[Tags] Error en exiftool:', stderr);
+      return false;
+    } else {
+      logger.warn('[Tags] Respuesta inesperada de exiftool:', { stdout, stderr });
+      return false;
+    }
+  } catch (error: any) {
+    logger.error('[Tags] Error guardando tags:', {
+      error: error.message,
+      code: error.code,
+      stderr: error.stderr,
+      stdout: error.stdout,
+      cmd: error.cmd
+    });
+    
+    // Verificar si el error es porque exiftool no está instalado
+    if (error.message && (error.message.includes('not found') || error.code === 'ENOENT')) {
+      logger.error('[Tags] exiftool NO está instalado en el sistema');
+    }
+    
+    return false;
+  }
+});
+
+// Obtener categorías de keywords del XML
+ipcMain.handle('get-keywords-categories', async () => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const keywordsPath = path.join(userDataPath, 'Keywords.xml');
+    
+    // Si no existe, crear XML vacío (NO copiar de assets)
+    if (!fs.existsSync(keywordsPath)) {
+      const emptyXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<keywords version="2">\n</keywords>';
+      await fsPromises.writeFile(keywordsPath, emptyXml, 'utf-8');
+      logger.info('Keywords.xml creado vacío', { keywordsPath });
+      return []; // Retornar array vacío para primera vez
+    }
+    
+    // Leer y parsear XML
+    const xmlContent = await fsPromises.readFile(keywordsPath, 'utf-8');
+    const categories: Array<{name: string, tags: string[]}> = [];
+    
+    // Parsear XML manualmente (simple)
+    const setMatches = xmlContent.matchAll(/<set name="([^"]+)"[^>]*>([\s\S]*?)<\/set>/g);
+    
+    for (const match of setMatches) {
+      const categoryName = match[1];
+      const categoryContent = match[2];
+      const tags: string[] = [];
+      
+      const itemMatches = categoryContent.matchAll(/<item name="([^"]+)"\s*\/>/g);
+      for (const itemMatch of itemMatches) {
+        tags.push(itemMatch[1]);
+      }
+      
+      categories.push({ name: categoryName, tags });
+    }
+    
+    logger.info('Categorías cargadas', { count: categories.length, keywordsPath });
+    return categories;
+  } catch (error) {
+    logger.error('Error cargando categorías', error);
+    return [];
+  }
+});
+
+// Guardar categorías de keywords en XML
+ipcMain.handle('save-keywords-categories', async (event, categories: Array<{name: string, tags: string[]}>) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const keywordsPath = path.join(userDataPath, 'Keywords.xml');
+    
+    // Construir XML
+    let xmlContent = '<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>\n<keywords version="2">\n';
+    
+    for (const category of categories) {
+      xmlContent += `\t<set name="${category.name}" disclosed="true">\n`;
+      for (const tag of category.tags) {
+        xmlContent += `\t\t<item name="${tag}" />\n`;
+      }
+      xmlContent += '\t</set>\n';
+    }
+    
+    xmlContent += '</keywords>';
+    
+    await fsPromises.writeFile(keywordsPath, xmlContent, 'utf-8');
+    logger.info('Categorías guardadas', { count: categories.length, keywordsPath });
+    return true;
+  } catch (error) {
+    logger.error('Error guardando categorías', error);
     return false;
   }
 });

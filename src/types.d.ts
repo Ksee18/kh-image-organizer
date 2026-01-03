@@ -58,9 +58,20 @@ export interface HashProgress {
   percentage?: number;
 }
 
+export interface KeywordCategory {
+  name: string;
+  tags: string[];
+}
+
+export interface ImageTagsAndRating {
+  tags: string[];
+  rating: number;
+}
+
 export interface ElectronAPI {
   openDirectoryDialog: () => Promise<string | null>;
   getImagesFromDirectory: (directoryPath: string) => Promise<string[]>;
+  getImagesFromDirectoryRecursive: (directoryPath: string) => Promise<string[]>;
   getImageMetadata: (imagePaths: string[]) => Promise<ImageMetadata[]>;
   getExplorerDateOrder: (directoryPath: string, descending: boolean) => Promise<string[] | null>;
   organizeByYear: (directoryPath: string) => Promise<{ success: boolean; message?: string; error?: string }>;
@@ -84,6 +95,13 @@ export interface ElectronAPI {
   getHashCacheSize: (directoryPath: string) => Promise<number>;
   saveHashCache: (directoryPath: string, hashes: ImageHash[]) => Promise<boolean>;
   clearHashCache: (directoryPath: string) => Promise<boolean>;
+  checkExiftoolInstalled: () => Promise<boolean>;
+  getImageTagsAndRating: (imagePath: string) => Promise<ImageTagsAndRating>;
+  getImagesTagsAndRatingBatch: (imagePaths: string[]) => Promise<Array<{path: string, tags: string[], rating: number}>>;
+  setImageRating: (imagePath: string, rating: number) => Promise<boolean>;
+  setImageTags: (imagePath: string, tags: string[]) => Promise<boolean>;
+  getKeywordsCategories: () => Promise<KeywordCategory[]>;
+  saveKeywordsCategories: (categories: KeywordCategory[]) => Promise<boolean>;
   windowMinimize: () => void;
   windowMaximize: () => void;
   windowClose: () => void;

@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectoryDialog: () => ipcRenderer.invoke('open-directory-dialog'),
   getImagesFromDirectory: (directoryPath: string) => 
     ipcRenderer.invoke('get-images-from-directory', directoryPath),
+  getImagesFromDirectoryRecursive: (directoryPath: string) =>
+    ipcRenderer.invoke('get-images-from-directory-recursive', directoryPath),
   getImageMetadata: (imagePaths: string[]) => 
     ipcRenderer.invoke('get-image-metadata', imagePaths),
   getExplorerDateOrder: (directoryPath: string, descending: boolean) =>
@@ -57,6 +59,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('copy-image-to-clipboard', filePath),
   clearHashCache: (directoryPath: string) =>
     ipcRenderer.invoke('clear-hash-cache', directoryPath),
+  checkExiftoolInstalled: () =>
+    ipcRenderer.invoke('check-exiftool-installed'),
+  getImageTagsAndRating: (imagePath: string) =>
+    ipcRenderer.invoke('get-image-tags-and-rating', imagePath),
+  getImagesTagsAndRatingBatch: (imagePaths: string[]) =>
+    ipcRenderer.invoke('get-images-tags-and-rating-batch', imagePaths),
+  setImageRating: (imagePath: string, rating: number) =>
+    ipcRenderer.invoke('set-image-rating', imagePath, rating),
+  setImageTags: (imagePath: string, tags: string[]) =>
+    ipcRenderer.invoke('set-image-tags', imagePath, tags),
+  getKeywordsCategories: () =>
+    ipcRenderer.invoke('get-keywords-categories'),
+  saveKeywordsCategories: (categories: any[]) =>
+    ipcRenderer.invoke('save-keywords-categories', categories),
   windowMinimize: () => ipcRenderer.send('window-minimize'),
   windowMaximize: () => ipcRenderer.send('window-maximize'),
   windowClose: () => ipcRenderer.send('window-close'),
